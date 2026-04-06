@@ -75,4 +75,16 @@ public class SubmissionService {
 		}
 		return submission;
 	}
+
+	/** 문제 세트별 제출 목록을 조회합니다. */
+	public List<Submission> getByQuestionSetId(String questionSetId) {
+		return submissions.values().stream()
+			.filter(submission -> submission.getQuestionSetId().equals(questionSetId))
+			.toList();
+	}
+
+	/** 전체 제출 목록을 조회합니다. */
+	public List<Submission> getAll() {
+		return submissions.values().stream().toList();
+	}
 }
