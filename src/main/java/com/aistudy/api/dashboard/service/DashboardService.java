@@ -58,8 +58,10 @@ public class DashboardService {
 		List<Submission> submissions = submissionService.getAll();
 		List<QuestionSet> questionSets = questionSetService.getAll();
 		double averageScore = submissions.stream().mapToInt(Submission::getScore).average().orElse(0);
-		double participationRate = questionSets.isEmpty() ? 0 : Math.min(100.0, (submissions.size() * 100.0) / questionSets.size());
-		double completionRate = participationRate;
+		long participatedSetCount = submissions.stream().map(Submission::getQuestionSetId).distinct().count();
+		long completedSetCount = submissions.stream().filter(submission -> submission.getScore() >= 0).map(Submission::getQuestionSetId).distinct().count();
+		double participationRate = questionSets.isEmpty() ? 0 : Math.min(100.0, (participatedSetCount * 100.0) / questionSets.size());
+		double completionRate = questionSets.isEmpty() ? 0 : Math.min(100.0, (completedSetCount * 100.0) / questionSets.size());
 		return new OperatorOverviewResponse(averageScore, participationRate, completionRate);
 	}
 
