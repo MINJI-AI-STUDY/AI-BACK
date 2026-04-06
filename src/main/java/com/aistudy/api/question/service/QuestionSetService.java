@@ -9,6 +9,7 @@ import com.aistudy.api.question.dto.GenerateQuestionSetRequest;
 import com.aistudy.api.question.dto.UpdateQuestionRequest;
 import com.aistudy.api.question.model.Question;
 import com.aistudy.api.question.model.QuestionSet;
+import com.aistudy.api.question.model.QuestionSetStatus;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +70,15 @@ public class QuestionSetService {
 			throw new NotFoundException("문제 세트를 찾을 수 없습니다.");
 		}
 		return questionSet;
+	}
+
+	/** 배포 코드로 공개된 문제 세트를 찾습니다. */
+	public QuestionSet getPublishedByCode(String distributionCode) {
+		return questionSets.values().stream()
+			.filter(questionSet -> distributionCode.equals(questionSet.getDistributionCode()))
+			.filter(questionSet -> questionSet.getStatus() == QuestionSetStatus.PUBLISHED)
+			.findFirst()
+			.orElseThrow(() -> new NotFoundException("문제 세트를 찾을 수 없습니다."));
 	}
 
 	private QuestionSet getOwnedQuestionSet(String teacherId, String questionSetId) {
