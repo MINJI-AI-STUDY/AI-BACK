@@ -7,6 +7,13 @@ import com.aistudy.api.material.dto.MaterialSummaryResponse;
 import com.aistudy.api.material.model.Material;
 import com.aistudy.api.material.service.MaterialService;
 import jakarta.validation.constraints.NotBlank;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,5 +68,22 @@ public class MaterialController {
 	) {
 		AuthUser teacher = authService.requireRole(authorizationHeader, Role.TEACHER);
 		return MaterialSummaryResponse.from(materialService.retry(teacher.userId(), materialId));
+	}
+
+	/** 교사와 학생이 공통으로 자료 PDF를 조회합니다. */
+	@GetMapping("/document/{materialId}")
+	public ResponseEntity<Resource> document(
+		@RequestHeader(name = "Authorization", required = false) String authorizationHeader,
+		@PathVariable String materialId
+	) throws MalformedURLException {
+		authService.getCurrentUser(authorizationHeader);
+		Material material = materialService.getById(materialId);
+		Path filePath = Path.of(material.getFilePath());
+		Resource resource = new UrlResource(filePath.toUri());
+
+		return ResponseEntity.ok()
+			.contentType(MediaType.APPLICATION_PDF)
+			.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName() + "\"")
+			.body(resource);
 	}
 }
