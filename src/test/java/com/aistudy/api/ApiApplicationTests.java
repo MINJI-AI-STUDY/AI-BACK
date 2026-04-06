@@ -19,6 +19,10 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import com.aistudy.api.common.integration.AiIntegrationService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -273,12 +277,94 @@ class ApiApplicationTests {
 			.andExpect(status().isBadRequest());
 	}
 
+	/**
+	 * F4 학생 제출과 결과 조회 계약을 고정합니다.
+	 */
+	@Test
+	void 학생이_문제를_제출하고_결과를_조회할_수_있다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "학생 제출 자료", "설명");
+		String generateResponse = mockMvc.perform(
+			post("/api/teacher/materials/" + materialId + "/question-sets/generate")
+				.header("Authorization", "Bearer " + teacherToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"questionCount":2,"difficulty":"EASY"}
+					""")
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		String questionSetId = generateResponse.replaceAll(".*\"questionSetId\":\"([^\"]+)\".*", "$1");
+		String questionSetDetail = mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/teacher/question-sets/" + questionSetId)
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		List<String> questionIds = extractQuestionIds(questionSetDetail);
+		String firstQuestionId = questionIds.get(0);
+		String secondQuestionId = questionIds.get(1);
+
+		String publishResponse = mockMvc.perform(
+			post("/api/teacher/question-sets/" + questionSetId + "/publish")
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		String distributionCode = publishResponse.replaceAll(".*\"distributionCode\":\"([^\"]+)\".*", "$1");
+		String studentToken = studentAccessToken();
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/student/question-sets/" + distributionCode)
+				.header("Authorization", "Bearer " + studentToken)
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.questions.length()").value(2));
+
+		String submissionResponse = mockMvc.perform(
+			post("/api/student/question-sets/" + distributionCode + "/submissions")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"answers":[{"questionId":"%s","selectedOptionIndex":0},{"questionId":"%s","selectedOptionIndex":0}]}
+					""".formatted(firstQuestionId, secondQuestionId))
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.submissionId").isNotEmpty())
+			.andReturn().getResponse().getContentAsString();
+
+		String submissionId = submissionResponse.replaceAll(".*\"submissionId\":\"([^\"]+)\".*", "$1");
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/student/submissions/" + submissionId + "/result")
+				.header("Authorization", "Bearer " + studentToken)
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.score").exists());
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"loginId":"teacher","password":"teacher123"}
+					""")
+		)
+			.andReturn()
+			.getResponse()
+			.getContentAsString()
+			.replaceAll(".*\"accessToken\":\"([^\"]+)\".*", "$1");
+	}
+
+	private String studentAccessToken() throws Exception {
+		return mockMvc.perform(
+			post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"loginId":"student","password":"student123"}
 					""")
 		)
 			.andReturn()
@@ -300,5 +386,14 @@ class ApiApplicationTests {
 			.getResponse()
 			.getContentAsString()
 			.replaceAll(".*\"materialId\":\"([^\"]+)\".*", "$1");
+	}
+
+	private List<String> extractQuestionIds(String payload) {
+		Matcher matcher = Pattern.compile("\\\"id\\\":\\\"(question-[^\\\"]+)\\\"").matcher(payload);
+		List<String> ids = new ArrayList<>();
+		while (matcher.find()) {
+			ids.add(matcher.group(1));
+		}
+		return ids;
 	}
 }
