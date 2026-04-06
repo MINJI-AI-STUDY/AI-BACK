@@ -345,6 +345,63 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.score").exists());
 	}
 
+	/**
+	 * F4 중복 제출 차단 계약을 고정합니다.
+	 */
+	@Test
+	void 이미_제출한_세트는_다시_제출할_수_없다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "중복 제출 자료", "설명");
+		String generateResponse = mockMvc.perform(
+			post("/api/teacher/materials/" + materialId + "/question-sets/generate")
+				.header("Authorization", "Bearer " + teacherToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"questionCount":2,"difficulty":"EASY"}
+					""")
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		String questionSetId = generateResponse.replaceAll(".*\"questionSetId\":\"([^\"]+)\".*", "$1");
+		String questionSetDetail = mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/teacher/question-sets/" + questionSetId)
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		List<String> questionIds = extractQuestionIds(questionSetDetail);
+		String publishResponse = mockMvc.perform(
+			post("/api/teacher/question-sets/" + questionSetId + "/publish")
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		String distributionCode = publishResponse.replaceAll(".*\"distributionCode\":\"([^\"]+)\".*", "$1");
+		String studentToken = studentAccessToken();
+		String submitPayload = """
+			{"answers":[{"questionId":"%s","selectedOptionIndex":0},{"questionId":"%s","selectedOptionIndex":0}]}
+			""".formatted(questionIds.get(0), questionIds.get(1));
+
+		mockMvc.perform(
+			post("/api/student/question-sets/" + distributionCode + "/submissions")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(submitPayload)
+		)
+			.andExpect(status().isOk());
+
+		mockMvc.perform(
+			post("/api/student/question-sets/" + distributionCode + "/submissions")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(submitPayload)
+		)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")
