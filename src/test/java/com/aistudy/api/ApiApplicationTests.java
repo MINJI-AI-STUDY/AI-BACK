@@ -488,6 +488,31 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.grounded").value(true));
 	}
 
+	/**
+	 * F6 AI 실패 시 fallback 응답 계약을 고정합니다.
+	 */
+	@Test
+	void AI_실패시_fallback_답변을_반환한다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("자료 핵심 개념 설명");
+		when(aiIntegrationService.ask(anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("AI 실패", List.of(), false, true));
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "fallback 자료", "설명");
+		String studentToken = studentAccessToken();
+
+		mockMvc.perform(
+			post("/api/student/materials/" + materialId + "/qa")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"question":"근거를 못 찾으면 어떻게 돼?"}
+					""")
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.grounded").value(true))
+			.andExpect(jsonPath("$.insufficientEvidence").value(false));
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")

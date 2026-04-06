@@ -27,6 +27,7 @@ public class QaService {
 	public QaResponse ask(String studentId, String materialId, String question) {
 		Material material = materialService.getById(materialId);
 		QaResponse response = aiIntegrationService.ask(material.getTitle() + "\n" + material.getExtractedText() + "\n질문: " + question);
+		String status = response.insufficientEvidence() ? "INSUFFICIENT_EVIDENCE" : "SUCCESS";
 		if (!response.grounded()) {
 			response = new QaResponse(
 				material.getTitle() + " 자료 기준 기본 답변입니다: " + question,
@@ -34,6 +35,7 @@ public class QaService {
 				true,
 				false
 			);
+			status = "FALLBACK";
 		}
 		QALog log = new QALog(
 			"qa-" + UUID.randomUUID(),
@@ -42,7 +44,7 @@ public class QaService {
 			question,
 			response.answer(),
 			response.grounded(),
-			response.insufficientEvidence() ? "INSUFFICIENT_EVIDENCE" : "SUCCESS",
+			status,
 			LocalDateTime.now()
 		);
 		logs.put(log.getId(), log);
