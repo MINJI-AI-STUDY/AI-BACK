@@ -51,7 +51,7 @@ public class MaterialService {
 			file.transferTo(targetPath);
 			String extractedText = aiIntegrationService.extractMaterial(title, description, file.getOriginalFilename());
 			material.markReady(extractedText.isBlank() ? buildExtractedText(title, description, file.getOriginalFilename()) : extractedText);
-		} catch (IOException exception) {
+		} catch (Exception exception) {
 			material.markFailed("파일 저장 또는 분석 준비에 실패했습니다.");
 		}
 
