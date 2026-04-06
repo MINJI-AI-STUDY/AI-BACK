@@ -43,3 +43,4 @@
 - `엔티티_및_상태전이.md`
 - `AI_SERVICE_README.md`
 - `API_SPRING_HELP.md`
+- `학교-학급_멀티테넌시_구현계획.md`
