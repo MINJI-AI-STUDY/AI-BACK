@@ -178,4 +178,106 @@ class ApiApplicationTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("READY"));
 	}
+
+	/**
+	 * F3 문제 생성 성공 계약을 고정합니다.
+	 */
+	@Test
+	void 문제_세트_생성을_반환한다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+
+		String accessToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(accessToken, "문제 생성 자료", "설명");
+
+		mockMvc.perform(
+			post("/api/teacher/materials/" + materialId + "/question-sets/generate")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"questionCount":2,"difficulty":"EASY"}
+					""")
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.questionSetId").isNotEmpty())
+			.andExpect(jsonPath("$.status").value("REVIEW_REQUIRED"))
+			.andExpect(jsonPath("$.questions.length()").value(2));
+	}
+
+	/**
+	 * F3 제외되지 않은 문항이 없으면 배포를 차단합니다.
+	 */
+	@Test
+	void 배포_가능한_문항이_없으면_배포를_거부한다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+
+		String accessToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(accessToken, "배포 차단 자료", "설명");
+        String questionSetId = mockMvc.perform(
+			post("/api/teacher/materials/" + materialId + "/question-sets/generate")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"questionCount":1,"difficulty":"EASY"}
+					""")
+		)
+			.andReturn()
+			.getResponse()
+			.getContentAsString()
+			.replaceAll(".*\"questionSetId\":\"([^\"]+)\".*", "$1");
+
+		String questionId = mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/teacher/question-sets/" + questionSetId)
+				.header("Authorization", "Bearer " + accessToken)
+		)
+			.andReturn()
+			.getResponse()
+			.getContentAsString()
+			.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.patch("/api/teacher/question-sets/" + questionSetId + "/questions/" + questionId)
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stem":"수정 문항","options":["A","B","C","D"],"correctOptionIndex":0,"explanation":"해설","conceptTags":["태그1"],"excluded":true}
+					""")
+		)
+			.andExpect(status().isOk());
+
+		mockMvc.perform(
+			post("/api/teacher/question-sets/" + questionSetId + "/publish")
+				.header("Authorization", "Bearer " + accessToken)
+		)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+	}
+
+	private String teacherAccessToken() throws Exception {
+		return mockMvc.perform(
+			post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"loginId":"teacher","password":"teacher123"}
+					""")
+		)
+			.andReturn()
+			.getResponse()
+			.getContentAsString()
+			.replaceAll(".*\"accessToken\":\"([^\"]+)\".*", "$1");
+	}
+
+	private String uploadReadyMaterial(String accessToken, String title, String description) throws Exception {
+		MockMultipartFile file = new MockMultipartFile("file", "sample.pdf", "application/pdf", "test".getBytes());
+		return mockMvc.perform(
+			MockMvcRequestBuilders.multipart("/api/teacher/materials")
+				.file(file)
+				.param("title", title)
+				.param("description", description)
+				.header("Authorization", "Bearer " + accessToken)
+		)
+			.andReturn()
+			.getResponse()
+			.getContentAsString()
+			.replaceAll(".*\"materialId\":\"([^\"]+)\".*", "$1");
+	}
 }
