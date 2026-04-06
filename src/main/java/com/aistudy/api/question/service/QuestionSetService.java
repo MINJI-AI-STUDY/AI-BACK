@@ -72,6 +72,11 @@ public class QuestionSetService {
 		return questionSet;
 	}
 
+	/** 전체 문제 세트를 반환합니다. */
+	public List<QuestionSet> getAll() {
+		return new ArrayList<>(questionSets.values());
+	}
+
 	/** 배포 코드로 공개된 문제 세트를 찾습니다. */
 	public QuestionSet getPublishedByCode(String distributionCode) {
 		return questionSets.values().stream()

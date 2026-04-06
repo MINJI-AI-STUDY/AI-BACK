@@ -402,6 +402,67 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
 	}
 
+	/**
+	 * F5 교사/운영자 대시보드 계약을 고정합니다.
+	 */
+	@Test
+	void 교사와_운영자가_대시보드를_조회할_수_있다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "대시보드 자료", "설명");
+		String generateResponse = mockMvc.perform(
+			post("/api/teacher/materials/" + materialId + "/question-sets/generate")
+				.header("Authorization", "Bearer " + teacherToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"questionCount":2,"difficulty":"EASY"}
+					""")
+		)
+			.andReturn().getResponse().getContentAsString();
+
+		String questionSetId = generateResponse.replaceAll(".*\"questionSetId\":\"([^\"]+)\".*", "$1");
+		String questionSetDetail = mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/teacher/question-sets/" + questionSetId)
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andReturn().getResponse().getContentAsString();
+		List<String> questionIds = extractQuestionIds(questionSetDetail);
+
+		String publishResponse = mockMvc.perform(
+			post("/api/teacher/question-sets/" + questionSetId + "/publish")
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andReturn().getResponse().getContentAsString();
+		String distributionCode = publishResponse.replaceAll(".*\"distributionCode\":\"([^\"]+)\".*", "$1");
+
+		String studentToken = studentAccessToken();
+		mockMvc.perform(
+			post("/api/student/question-sets/" + distributionCode + "/submissions")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"answers":[{"questionId":"%s","selectedOptionIndex":0},{"questionId":"%s","selectedOptionIndex":0}]}
+					""".formatted(questionIds.get(0), questionIds.get(1)))
+		)
+			.andExpect(status().isOk());
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/teacher/question-sets/" + questionSetId + "/dashboard")
+				.header("Authorization", "Bearer " + teacherToken)
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.studentScores.length()").value(1));
+
+		String operatorToken = operatorAccessToken();
+		mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/operator/overview")
+				.header("Authorization", "Bearer " + operatorToken)
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.averageScore").exists());
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")
@@ -422,6 +483,20 @@ class ApiApplicationTests {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"loginId":"student","password":"student123"}
+					""")
+		)
+			.andReturn()
+			.getResponse()
+			.getContentAsString()
+			.replaceAll(".*\"accessToken\":\"([^\"]+)\".*", "$1");
+	}
+
+	private String operatorAccessToken() throws Exception {
+		return mockMvc.perform(
+			post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"loginId":"operator","password":"operator123"}
 					""")
 		)
 			.andReturn()
