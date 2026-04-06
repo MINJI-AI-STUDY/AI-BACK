@@ -252,6 +252,27 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
 	}
 
+	/**
+	 * F3 생성 결과 수가 요청 수와 다르면 생성 자체를 거부합니다.
+	 */
+	@Test
+	void 생성_결과_수가_요청_수와_다르면_거부한다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+
+		String accessToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(accessToken, "생성 수 검증 자료", "설명");
+
+		mockMvc.perform(
+			post("/api/teacher/materials/" + materialId + "/question-sets/generate")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"questionCount":0,"difficulty":"EASY"}
+					""")
+		)
+			.andExpect(status().isBadRequest());
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")

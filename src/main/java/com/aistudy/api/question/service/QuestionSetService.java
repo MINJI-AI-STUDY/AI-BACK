@@ -32,8 +32,12 @@ public class QuestionSetService {
 		if (material.getStatus() != MaterialStatus.READY) {
 			throw new BadRequestException("분석 완료된 자료만 문제를 생성할 수 있습니다.");
 		}
+		List<Question> questions = createQuestions(material, request.questionCount());
+		if (questions.size() != request.questionCount()) {
+			throw new BadRequestException("요청한 문항 수와 생성 결과 수가 일치하지 않습니다.");
+		}
 		String questionSetId = "qset-" + UUID.randomUUID();
-		QuestionSet questionSet = new QuestionSet(questionSetId, materialId, teacherId, request.difficulty(), createQuestions(material, request.questionCount()));
+		QuestionSet questionSet = new QuestionSet(questionSetId, materialId, teacherId, request.difficulty(), questions);
 		questionSets.put(questionSetId, questionSet);
 		return questionSet;
 	}
