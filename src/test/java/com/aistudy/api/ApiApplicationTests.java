@@ -463,6 +463,31 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.averageScore").exists());
 	}
 
+	/**
+	 * F6 자료 기반 질의응답 계약을 고정합니다.
+	 */
+	@Test
+	void 학생이_자료기반_질문을_할_수_있다() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("자료 핵심 개념 설명");
+		when(aiIntegrationService.ask(anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("자료 기반 답변입니다.", List.of("자료 핵심 개념 설명"), true, false));
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "질의응답 자료", "설명");
+		String studentToken = studentAccessToken();
+
+		mockMvc.perform(
+			post("/api/student/materials/" + materialId + "/qa")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"question":"핵심 개념이 뭐야?"}
+					""")
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.answer").value("자료 기반 답변입니다."))
+			.andExpect(jsonPath("$.grounded").value(true));
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")
