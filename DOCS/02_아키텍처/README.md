@@ -1,8 +1,8 @@
-# 02_architecture
+# 02_아키텍처
 
 ## 포함 문서
-- `backend_architecture.md`
-- `multitenancy.md`
+- `백엔드_아키텍처.md`
+- `멀티테넌시.md`
 
 ## 목적
 - 패키지 구조, 멀티테넌시, 시스템 경계를 설명합니다.

@@ -4,14 +4,14 @@
 - AI-BACK 저장소 내부에서만 백엔드 아키텍처, 정책, 기능/비기능 요구사항, API, 데이터 문서를 관리합니다.
 
 ## 문서 읽기 순서
-1. `01_overview/README.md`
-2. `02_architecture/README.md`
-3. `03_requirements/README.md`
-4. `04_policies/README.md`
-5. `05_api/README.md`
-6. `06_data/README.md`
-7. `07_adr/README.md`
-8. `08_plans/README.md`
+1. `01_개요/README.md`
+2. `02_아키텍처/README.md`
+3. `03_요구사항/README.md`
+4. `04_정책/README.md`
+5. `05_API명세/README.md`
+6. `06_데이터명세/README.md`
+7. `07_의사결정기록/README.md`
+8. `08_계획/README.md`
 
 ## 원칙
 - AI-BACK 관련 문서는 이 저장소의 `DOCS/`에서만 관리합니다.

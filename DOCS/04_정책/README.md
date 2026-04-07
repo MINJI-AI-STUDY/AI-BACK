@@ -1,8 +1,8 @@
-# 04_policies
+# 04_정책
 
 ## 포함 문서
-- `policy_catalog.md`
-- `common_policies.md`
+- `정책_카탈로그.md`
+- `공통_정책.md`
 
 ## 목적
 - 정책 코드를 가진 표 기반 정책정의서를 관리합니다.
