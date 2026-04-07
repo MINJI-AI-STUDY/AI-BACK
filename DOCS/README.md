@@ -1,31 +1,19 @@
-# current 문서 허브
+# AI-BACK 문서 허브
 
-## current 범위
-- 공통 기준: `DOCS/00_기준/`
-- 기능 명세: `DOCS/15_기능명세/`
+## 목적
+- AI-BACK 저장소 내부에서만 백엔드 아키텍처, 정책, 기능/비기능 요구사항, API, 데이터 문서를 관리합니다.
 
-## 읽는 순서
-1. `DOCS/00_기준/프로젝트_헌법.md`
-2. `DOCS/00_기준/통합_개발_테스트_방법론.md`
-3. `DOCS/00_기준/GitHub_형상관리_전략.md`
-4. `DOCS/00_기준/인프라_운영_전략.md`
-5. `DOCS/00_기준/작업_태스크_운영_원칙.md`
-6. `DOCS/00_기준/운영정책/README.md`
-7. `DOCS/15_기능명세/README.md`
-8. 필요한 세부 기능 문서
+## 문서 읽기 순서
+1. `01_overview/README.md`
+2. `02_architecture/README.md`
+3. `03_requirements/README.md`
+4. `04_policies/README.md`
+5. `05_api/README.md`
+6. `06_data/README.md`
+7. `07_adr/README.md`
+8. `08_plans/README.md`
 
-## 유지 원칙
-- 기준 문서는 `00_기준`에만 둡니다.
-- PRD, USM, 기능명세는 `15_기능명세`에만 둡니다.
-- 구현 직전 컨텍스트팩은 `DOCS/00_기준/작업_컨텍스트팩/`에서 관리합니다.
-- AGENTS.md를 제외한 루트 markdown 문서는 모두 `DOCS/` 하위 적절한 위치에 둡니다.
-- 실행 메모/계획/문제 해결 기록은 `.sisyphus/` 또는 `.omx/`에 둡니다.
-
-## current 가 아닌 범위
-- 루트에는 진입점 파일(`AGENTS.md`)만 둡니다.
-- 임시 산출물은 current 문서로 취급하지 않습니다.
-
-## 보조 current 위치
-- 운영 세부 정책: `DOCS/00_기준/운영정책/`
-- 기술 결정 기록: `DOCS/00_기준/ADR/`
-- 구현 감사/보고: `DOCS/00_기준/작업_감사/`
+## 원칙
+- AI-BACK 관련 문서는 이 저장소의 `DOCS/`에서만 관리합니다.
+- 변경 이력은 AI-BACK 저장소의 GitHub Flow 이력으로만 남깁니다.
+- 기존 `00_기준/`, `15_기능명세/` 문서는 현재 이행 중인 source 문서이며, 신규 온보딩은 `01~09` 허브를 우선합니다.
