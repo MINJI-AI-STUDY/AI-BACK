@@ -1,34 +1,70 @@
 package com.aistudy.api.auth;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.List;
 import com.aistudy.api.common.ForbiddenException;
+import io.jsonwebtoken.JwtException;
+import java.time.LocalDateTime;
+import java.util.UUID;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
 
-	private final List<AuthUser> users = List.of(
-		new AuthUser("teacher-1", "teacher", "teacher123", "교사 데모", Role.TEACHER),
-		new AuthUser("student-1", "student", "student123", "학생 데모", Role.STUDENT),
-		new AuthUser("operator-1", "operator", "operator123", "운영자 데모", Role.OPERATOR)
-	);
+	private final AuthUserRepository authUserRepository;
+	private final RefreshTokenRepository refreshTokenRepository;
+	private final PasswordEncoder passwordEncoder;
+	private final JwtTokenProvider jwtTokenProvider;
+
+	public AuthService(AuthUserRepository authUserRepository, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
+		this.authUserRepository = authUserRepository;
+		this.refreshTokenRepository = refreshTokenRepository;
+		this.passwordEncoder = passwordEncoder;
+		this.jwtTokenProvider = jwtTokenProvider;
+	}
 
 	/** 로그인 요청을 검증하고 토큰을 발급합니다. */
+	@Transactional
 	public LoginResponse login(LoginRequest request) {
-		AuthUser user = users.stream()
-			.filter(candidate -> candidate.loginId().equals(request.loginId()) && candidate.password().equals(request.password()))
-			.findFirst()
+		AuthUser user = authUserRepository.findByLoginId(request.loginId())
+			.filter(AuthUserEntity::isActive)
+			.filter(candidate -> passwordEncoder.matches(request.password(), candidate.getPassword()))
+			.map(AuthUserEntity::toAuthUser)
 			.orElseThrow(() -> new AuthException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
-		return new LoginResponse(createToken(user), user.role(), user.displayName());
+		return LoginResponse.from(issueTokens(user));
+	}
+
+	@Transactional
+	public TokenResponse refresh(RefreshTokenRequest request) {
+		RefreshTokenEntity refreshToken = refreshTokenRepository.findByToken(request.refreshToken())
+			.orElseThrow(() -> new AuthException("유효하지 않은 refresh token입니다."));
+		if (refreshToken.isRevoked() || refreshToken.isExpired(LocalDateTime.now())) {
+			throw new AuthException("만료되었거나 취소된 refresh token입니다.");
+		}
+
+		AuthUser user = authUserRepository.findById(refreshToken.getUserId())
+			.filter(AuthUserEntity::isActive)
+			.map(AuthUserEntity::toAuthUser)
+			.orElseThrow(() -> new AuthException("사용자를 찾을 수 없습니다."));
+
+		refreshToken.revoke();
+		refreshTokenRepository.save(refreshToken);
+		return issueTokens(user);
+	}
+
+	@Transactional
+	public void logout(LogoutRequest request) {
+		refreshTokenRepository.findByToken(request.refreshToken()).ifPresent(token -> {
+			token.revoke();
+			refreshTokenRepository.save(token);
+		});
 	}
 
 	/** Authorization 헤더에서 현재 사용자를 복원합니다. */
 	public MeResponse me(String authorizationHeader) {
 		AuthUser user = getCurrentUser(authorizationHeader);
-		return new MeResponse(user.userId(), user.role(), user.displayName());
+		return new MeResponse(user.userId(), user.schoolId(), user.classroomId(), user.role(), user.displayName());
 	}
 
 	/** 현재 사용자를 반환합니다. */
@@ -39,12 +75,12 @@ public class AuthService {
 
 		try {
 			String token = authorizationHeader.substring(7);
-			String loginId = new String(Base64.getDecoder().decode(token), StandardCharsets.UTF_8);
-			return users.stream()
-			.filter(candidate -> candidate.loginId().equals(loginId))
-			.findFirst()
+			String loginId = jwtTokenProvider.getLoginId(token);
+			return authUserRepository.findByLoginId(loginId)
+				.filter(AuthUserEntity::isActive)
+				.map(AuthUserEntity::toAuthUser)
 			.orElseThrow(() -> new AuthException("유효하지 않은 토큰입니다."));
-		} catch (IllegalArgumentException exception) {
+		} catch (JwtException | IllegalArgumentException exception) {
 			throw new AuthException("유효하지 않은 토큰입니다.");
 		}
 	}
@@ -58,8 +94,24 @@ public class AuthService {
 		return user;
 	}
 
-	/** 토큰 문자열을 생성합니다. */
-	private String createToken(AuthUser user) {
-		return Base64.getEncoder().encodeToString(user.loginId().getBytes(StandardCharsets.UTF_8));
+	private TokenResponse issueTokens(AuthUser user) {
+		revokeActiveRefreshTokens(user.userId());
+		String accessToken = jwtTokenProvider.createToken(user);
+		String refreshToken = UUID.randomUUID().toString();
+		refreshTokenRepository.save(new RefreshTokenEntity(
+			UUID.randomUUID().toString(),
+			user.userId(),
+			refreshToken,
+			LocalDateTime.now().plusDays(7)
+		));
+		return TokenResponse.from(accessToken, refreshToken, user);
 	}
+
+	private void revokeActiveRefreshTokens(String userId) {
+		refreshTokenRepository.findByUserIdAndRevokedFalse(userId).forEach(token -> {
+			token.revoke();
+			refreshTokenRepository.save(token);
+		});
+	}
+
 }

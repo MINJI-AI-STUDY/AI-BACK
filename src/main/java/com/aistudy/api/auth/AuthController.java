@@ -24,6 +24,16 @@ public class AuthController {
 		return authService.login(request);
 	}
 
+	@PostMapping("/refresh")
+	public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+		return authService.refresh(request);
+	}
+
+	@PostMapping("/logout")
+	public void logout(@Valid @RequestBody LogoutRequest request) {
+		authService.logout(request);
+	}
+
 	/** 현재 인증된 사용자를 반환합니다. */
 	@GetMapping("/me")
 	public MeResponse me(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
