@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 @Service
@@ -34,6 +35,7 @@ public class SchoolMasterSyncService {
 		this.pageSize = pageSize;
 	}
 
+	@Transactional
 	public SchoolMasterSyncResponse syncAll() {
 		if (apiKey == null || apiKey.isBlank()) {
 			throw new BadRequestException("학교 Open API 키가 설정되지 않았습니다.");
@@ -54,7 +56,9 @@ public class SchoolMasterSyncService {
 				String region = value(row, "ATPT_OFCDC_SC_NM", "시도교육청명");
 				String emailDomain = deriveDomain(name);
 				if (existing.isPresent()) {
-					existing.get().updateFromApi(name, level, address, region, emailDomain, true);
+					SchoolMasterEntity entity = existing.get();
+					entity.updateFromApi(name, level, address, region, emailDomain, true);
+					schoolMasterRepository.save(entity);
 					updated++;
 				} else {
 					schoolMasterRepository.save(new SchoolMasterEntity(schoolCode, name, level, address, region, emailDomain, true));
@@ -69,7 +73,7 @@ public class SchoolMasterSyncService {
 	@SuppressWarnings("unchecked")
 	private List<Map<String, Object>> fetchPage(int page) {
 		Map<String, Object> payload = restClient.get()
-			.uri(uriBuilder -> uriBuilder.pathSegment(apiKey, endpoint).queryParam("Type", "json").queryParam("pIndex", page).queryParam("pSize", pageSize).build())
+			.uri(uriBuilder -> uriBuilder.pathSegment(endpoint).queryParam("KEY", apiKey).queryParam("Type", "json").queryParam("pIndex", page).queryParam("pSize", pageSize).build())
 			.accept(MediaType.APPLICATION_JSON)
 			.retrieve()
 			.body(Map.class);
