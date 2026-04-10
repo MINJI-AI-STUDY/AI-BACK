@@ -9,6 +9,10 @@
 - `APP_SCHOOL_API_ENDPOINT`
 - `APP_SCHOOL_API_PAGE_SIZE`
 
+## 권장 기본값
+- `APP_SCHOOL_API_PAGE_SIZE=100`
+- 실측 기준 `1000`은 NEIS upstream 500을 유발할 수 있어 기본값으로 사용하지 않습니다.
+
 ## 동기화 엔드포인트
 - `POST /api/operator/schools/sync-master`
 

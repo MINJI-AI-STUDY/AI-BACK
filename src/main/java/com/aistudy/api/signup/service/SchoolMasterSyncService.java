@@ -4,32 +4,46 @@ import com.aistudy.api.common.BadRequestException;
 import com.aistudy.api.signup.dto.SchoolMasterSyncResponse;
 import com.aistudy.api.signup.model.SchoolMasterEntity;
 import com.aistudy.api.signup.repository.SchoolMasterRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
 
 @Service
 public class SchoolMasterSyncService {
+	private static final Logger log = LoggerFactory.getLogger(SchoolMasterSyncService.class);
 	private final SchoolMasterRepository schoolMasterRepository;
-	private final RestClient restClient;
+	private final ObjectMapper objectMapper;
+	private final String baseUrl;
 	private final String apiKey;
 	private final String endpoint;
 	private final int pageSize;
 
 	public SchoolMasterSyncService(
 		SchoolMasterRepository schoolMasterRepository,
+		ObjectMapper objectMapper,
 		@Value("${app.school-api.base-url}") String baseUrl,
 		@Value("${app.school-api.key}") String apiKey,
 		@Value("${app.school-api.endpoint}") String endpoint,
 		@Value("${app.school-api.page-size}") int pageSize
 	) {
 		this.schoolMasterRepository = schoolMasterRepository;
-		this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+		this.objectMapper = objectMapper;
+		this.baseUrl = baseUrl;
 		this.apiKey = apiKey;
 		this.endpoint = endpoint;
 		this.pageSize = pageSize;
@@ -72,11 +86,24 @@ public class SchoolMasterSyncService {
 
 	@SuppressWarnings("unchecked")
 	private List<Map<String, Object>> fetchPage(int page) {
-		Map<String, Object> payload = restClient.get()
-			.uri(uriBuilder -> uriBuilder.pathSegment(endpoint).queryParam("KEY", apiKey).queryParam("Type", "json").queryParam("pIndex", page).queryParam("pSize", pageSize).build())
-			.accept(MediaType.APPLICATION_JSON)
-			.retrieve()
-			.body(Map.class);
+		Map<String, Object> payload;
+		try {
+			String url = baseUrl + "/" + endpoint
+				+ "?KEY=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8)
+				+ "&Type=json&pIndex=" + page + "&pSize=" + pageSize;
+			HttpURLConnection connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
+			connection.setConnectTimeout(10000);
+			connection.setReadTimeout(120000);
+			connection.setRequestProperty("User-Agent", "Mozilla/5.0");
+			connection.setRequestProperty("Accept", "application/json");
+			connection.setRequestMethod("GET");
+			try (InputStream inputStream = new BufferedInputStream(connection.getInputStream())) {
+				payload = objectMapper.readValue(inputStream, Map.class);
+			}
+		} catch (Exception exception) {
+			log.warn("학교 Open API Java 호출 실패, curl fallback 시도", exception);
+			payload = fetchPageWithCurl(page, exception);
+		}
 		if (payload == null) return List.of();
 		Object root = payload.get(endpoint);
 		if (!(root instanceof List<?> list) || list.size() < 2) return List.of();
@@ -96,5 +123,24 @@ public class SchoolMasterSyncService {
 		if (schoolName == null || schoolName.isBlank()) return null;
 		String normalized = schoolName.replaceAll("\\s+", "").toLowerCase();
 		return normalized + ".school.kr";
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> fetchPageWithCurl(int page, Exception originalException) {
+		try {
+			String url = baseUrl + "/" + endpoint
+				+ "?KEY=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8)
+				+ "&Type=json&pIndex=" + page + "&pSize=" + pageSize;
+			Process process = new ProcessBuilder("curl", "-s", url).start();
+			String body;
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+				body = reader.lines().collect(Collectors.joining());
+			}
+			process.waitFor();
+			return objectMapper.readValue(body, Map.class);
+		} catch (Exception curlException) {
+			log.error("학교 Open API curl fallback도 실패", curlException);
+			throw new BadRequestException("학교 Open API 호출에 실패했습니다: " + originalException.getClass().getSimpleName() + " - " + originalException.getMessage());
+		}
 	}
 }
