@@ -1,10 +1,17 @@
 package com.aistudy.api.dashboard.service;
 
+import com.aistudy.api.dashboard.dto.DocumentDashboardResponse;
+import com.aistudy.api.dashboard.dto.DocumentQuestionSetSummary;
 import com.aistudy.api.dashboard.dto.OperatorOverviewResponse;
 import com.aistudy.api.dashboard.dto.QuestionAccuracy;
 import com.aistudy.api.dashboard.dto.TeacherDashboardResponse;
 import com.aistudy.api.dashboard.dto.TeacherStudentScore;
 import com.aistudy.api.dashboard.dto.WeakConceptTag;
+import com.aistudy.api.material.dto.MaterialSummaryResponse;
+import com.aistudy.api.material.model.Material;
+import com.aistudy.api.material.service.MaterialService;
+import com.aistudy.api.qa.dto.QALogResponse;
+import com.aistudy.api.qa.service.QaService;
 import com.aistudy.api.question.model.Question;
 import com.aistudy.api.question.model.QuestionSet;
 import com.aistudy.api.question.service.QuestionSetService;
@@ -19,25 +26,32 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DashboardService {
+	private final MaterialService materialService;
 	private final QuestionSetService questionSetService;
 	private final SubmissionService submissionService;
+	private final QaService qaService;
 
-	public DashboardService(QuestionSetService questionSetService, SubmissionService submissionService) {
+	public DashboardService(MaterialService materialService, QuestionSetService questionSetService, SubmissionService submissionService, QaService qaService) {
+		this.materialService = materialService;
 		this.questionSetService = questionSetService;
 		this.submissionService = submissionService;
+		this.qaService = qaService;
 	}
 
-	/** 교사용 대시보드 집계 결과를 계산합니다. */
-	public TeacherDashboardResponse getTeacherDashboard(String questionSetId) {
-		QuestionSet questionSet = questionSetService.getById(questionSetId);
+	public TeacherDashboardResponse getTeacherDashboard(String schoolId, String questionSetId) {
+		QuestionSet questionSet = questionSetService.getSchoolScopedQuestionSet(schoolId, questionSetId);
 		List<Submission> submissions = submissionService.getByQuestionSetId(questionSetId);
-		List<TeacherStudentScore> studentScores = submissions.stream().map(submission -> new TeacherStudentScore(submission.getStudentId(), submission.getScore())).toList();
+		List<TeacherStudentScore> studentScores = submissions.stream()
+			.map(submission -> new TeacherStudentScore(submission.getStudentId(), submission.getScore()))
+			.toList();
 
 		Map<String, Double> accuracyMap = questionSet.getQuestions().stream()
 			.filter(question -> !question.isExcluded())
 			.collect(Collectors.toMap(Question::getId, question -> calculateAccuracy(question.getId(), submissions)));
 
-		List<QuestionAccuracy> questionAccuracy = accuracyMap.entrySet().stream().map(entry -> new QuestionAccuracy(entry.getKey(), entry.getValue())).toList();
+		List<QuestionAccuracy> questionAccuracy = accuracyMap.entrySet().stream()
+			.map(entry -> new QuestionAccuracy(entry.getKey(), entry.getValue()))
+			.toList();
 
 		Map<String, Long> weakConceptCounts = submissions.stream()
 			.flatMap(submission -> submission.getQuestionResults().stream())
@@ -53,7 +67,35 @@ public class DashboardService {
 		return new TeacherDashboardResponse(studentScores, questionAccuracy, weakConceptTags);
 	}
 
-	/** 운영자용 전체 요약 지표를 계산합니다. */
+	public DocumentDashboardResponse getDocumentDashboard(String schoolId, String materialId) {
+		Material material = materialService.getSchoolMaterial(schoolId, materialId);
+		List<QuestionSet> questionSets = questionSetService.getByMaterial(schoolId, materialId);
+		List<Submission> submissions = submissionService.getByMaterialId(schoolId, materialId);
+		List<QALogResponse> recentQaLogs = qaService.getTeacherLogs(schoolId, materialId).stream()
+			.limit(10)
+			.map(QALogResponse::from)
+			.toList();
+
+		long questionCount = questionSets.stream()
+			.flatMap(questionSet -> questionSet.getQuestions().stream())
+			.filter(question -> !question.isExcluded())
+			.count();
+		long participantCount = submissions.stream().map(Submission::getStudentId).distinct().count();
+		double averageScore = submissions.stream().mapToInt(Submission::getScore).average().orElse(0);
+
+		return new DocumentDashboardResponse(
+			MaterialSummaryResponse.from(material),
+			questionSets.size(),
+			questionCount,
+			submissions.size(),
+			participantCount,
+			Math.round(averageScore * 100.0) / 100.0,
+			qaService.countByMaterial(schoolId, materialId),
+			questionSets.stream().map(DocumentQuestionSetSummary::from).toList(),
+			recentQaLogs
+		);
+	}
+
 	public OperatorOverviewResponse getOperatorOverview() {
 		List<Submission> submissions = submissionService.getAll();
 		List<QuestionSet> questionSets = questionSetService.getAll();
