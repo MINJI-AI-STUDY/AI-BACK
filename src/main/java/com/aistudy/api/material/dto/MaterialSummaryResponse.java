@@ -5,6 +5,9 @@ import com.aistudy.api.material.model.MaterialStatus;
 
 public record MaterialSummaryResponse(
 	String materialId,
+	Long docNo,
+	String schoolId,
+	String channelId,
 	String title,
 	String description,
 	MaterialStatus status,
@@ -13,6 +16,9 @@ public record MaterialSummaryResponse(
 	public static MaterialSummaryResponse from(Material material) {
 		return new MaterialSummaryResponse(
 			material.getId(),
+			material.getDocNo(),
+			material.getSchoolId(),
+			material.getChannelId(),
 			material.getTitle(),
 			material.getDescription(),
 			material.getStatus(),

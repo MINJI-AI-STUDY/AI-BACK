@@ -2,6 +2,8 @@
 
 ## API 명세
 - `POST /api/student/materials/{materialId}/qa`
+- `GET /api/student/materials/{materialId}/qa-logs/me`
+- `GET /api/teacher/materials/{materialId}/qa-logs`
 
 ## 정책
 
@@ -11,7 +13,7 @@
 
 ### POL-QA-002 근거 응답 정책
 - 코드: `POL-QA-002`
-- 내용: 답변은 업로드된 자료를 기준으로 생성하고, 근거 snippet은 최대 2개만 노출합니다.
+- 내용: 답변은 업로드된 자료를 기준으로 생성하고, 근거 snippet은 `rag_top_k` 범위에서 노출합니다.
 
 ### POL-QA-003 근거 부족 안내 정책
 - 코드: `POL-QA-003`
@@ -24,3 +26,11 @@
 ### POL-QA-005 로그 저장 정책
 - 코드: `POL-QA-005`
 - 내용: 모든 질문/답변은 `materialId`, `studentId`, `question`, `answer`, `grounded`, `status`, `createdAt` 기준으로 저장합니다.
+
+### POL-QA-006 형식 보장 정책
+- 코드: `POL-QA-006`
+- 내용: 답변은 `[답변]`, `[근거 요약]`, `[판단]` 섹션을 포함하도록 정규화합니다.
+
+### POL-QA-007 도메인 차단 정책
+- 코드: `POL-QA-007`
+- 내용: 현재 업로드된 문서/학습 도메인과 무관한 질문은 차단 응답으로 처리합니다.

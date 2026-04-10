@@ -1,30 +1,42 @@
 package com.aistudy.api.common.integration;
 
 import com.aistudy.api.qa.dto.QaResponse;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 @Service
 public class AiIntegrationService {
+	private static final Pattern CONTROL_CHAR_PATTERN = Pattern.compile("[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]");
 
 	private final RestClient restClient;
 
 	public AiIntegrationService(@Value("${app.ai.base-url}") String aiBaseUrl) {
-		this.restClient = RestClient.builder().baseUrl(aiBaseUrl).build();
+		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+		requestFactory.setConnectTimeout(10000);
+		requestFactory.setReadTimeout(120000);
+		this.restClient = RestClient.builder().requestFactory(requestFactory).baseUrl(aiBaseUrl).build();
 	}
 
 	/** AI 서버에 자료 추출을 요청합니다. */
-	public String extractMaterial(String title, String description, String filename) {
+	public String extractMaterial(String title, String description, String filename, byte[] pdfBytes) {
 		try {
 			Map<String, Object> response = restClient.post()
 				.uri("/extract-material")
 				.contentType(MediaType.APPLICATION_JSON)
 				.accept(MediaType.APPLICATION_JSON)
-				.body(Map.of("title", title, "description", description, "filename", filename))
+				.body(Map.of(
+					"title", title,
+					"description", description,
+					"filename", filename,
+					"pdfBase64", Base64.getEncoder().encodeToString(pdfBytes)
+				))
 				.retrieve()
 				.body(Map.class);
 			return String.valueOf(response == null ? "" : response.getOrDefault("extractedText", ""));
@@ -33,14 +45,37 @@ public class AiIntegrationService {
 		}
 	}
 
-	/** AI 서버에 질문을 전달하고 응답을 반환합니다. */
-	public QaResponse ask(String question) {
+	public List<Map<String, Object>> generateQuestions(String materialTitle, String materialText, int questionCount) {
 		try {
+			String normalizedText = materialText == null ? "" : materialText.substring(0, Math.min(materialText.length(), 6000));
+			Map<String, Object> response = restClient.post()
+				.uri("/generate-questions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.accept(MediaType.APPLICATION_JSON)
+				.body(Map.of("material_title", materialTitle, "material_text", normalizedText, "question_count", questionCount))
+				.retrieve()
+				.body(Map.class);
+			if (response == null || !(response.get("questions") instanceof List<?> questions)) {
+				return List.of();
+			}
+			return questions.stream()
+				.filter(Map.class::isInstance)
+				.map(item -> (Map<String, Object>) item)
+				.toList();
+		} catch (Exception exception) {
+			return List.of();
+		}
+	}
+
+	/** AI 서버에 질문을 전달하고 응답을 반환합니다. */
+	public QaResponse ask(String context, String question) {
+		try {
+			String normalizedContext = normalizeContext(context);
 			Map<String, Object> response = restClient.post()
 				.uri("/qa")
 				.contentType(MediaType.APPLICATION_JSON)
 				.accept(MediaType.APPLICATION_JSON)
-				.body(Map.of("question", question))
+				.body(Map.of("context", normalizedContext, "question", question))
 				.retrieve()
 				.body(Map.class);
 			if (response == null) {
@@ -55,5 +90,12 @@ public class AiIntegrationService {
 		} catch (Exception exception) {
 			return new QaResponse("AI 서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.", List.of(), false, true);
 		}
+	}
+
+	private String normalizeContext(String context) {
+		String safe = context == null ? "" : CONTROL_CHAR_PATTERN.matcher(context).replaceAll(" ");
+		safe = safe.replace("\r", " ").replace("\n", " ");
+		safe = safe.replaceAll("\\s+", " ").trim();
+		return safe.substring(0, Math.min(safe.length(), 6000));
 	}
 }
