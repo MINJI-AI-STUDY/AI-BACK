@@ -66,6 +66,12 @@ public class SignupRequestEntity {
 	@Column(name = "reviewed_by")
 	private String reviewedBy;
 
+	@Column(name = "provisioned_login_id")
+	private String provisionedLoginId;
+
+	@Column(name = "provisioned_temp_password")
+	private String provisionedTempPassword;
+
 	protected SignupRequestEntity() {}
 
 	public SignupRequestEntity(String schoolId, String classroomId, String requesterName, String loginId, String passwordHash, SignupRole role, String schoolEmail, String studentRealName, boolean consentTerms, boolean consentPrivacy, boolean consentStudentNotice) {
@@ -101,12 +107,16 @@ public class SignupRequestEntity {
 	public boolean isConsentPrivacy() { return consentPrivacy; }
 	public boolean isConsentStudentNotice() { return consentStudentNotice; }
 	public String getRejectionReason() { return rejectionReason; }
+	public String getProvisionedLoginId() { return provisionedLoginId; }
+	public String getProvisionedTempPassword() { return provisionedTempPassword; }
 
-	public void approve(String reviewerUserId) {
+	public void approve(String reviewerUserId, String provisionedLoginId, String provisionedTempPassword) {
 		this.status = SignupStatus.APPROVED;
 		this.reviewedBy = reviewerUserId;
 		this.reviewedAt = LocalDateTime.now();
 		this.rejectionReason = null;
+		this.provisionedLoginId = provisionedLoginId;
+		this.provisionedTempPassword = provisionedTempPassword;
 	}
 
 	public void reject(String reviewerUserId, String rejectionReason) {

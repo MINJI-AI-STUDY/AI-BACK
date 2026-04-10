@@ -104,16 +104,18 @@ public class SignupService {
 		ensureSchoolOperator(reviewer, request.getSchoolId());
 		if (request.getStatus() != SignupStatus.PENDING) throw new BadRequestException("이미 처리된 가입 요청입니다.");
 		if (approve) {
+			String provisionedLoginId = request.getLoginId() == null ? "student-" + request.getId().substring(0, 8) : request.getLoginId();
+			String provisionedTempPassword = request.getPasswordHash() == null ? "student123" : null;
 			AuthUserEntity user = new AuthUserEntity(
 				request.getSchoolId(),
 				request.getClassroomId(),
-				request.getLoginId() == null ? "student-" + request.getId().substring(0, 8) : request.getLoginId(),
-				request.getPasswordHash() == null ? passwordEncoder.encode("student123") : request.getPasswordHash(),
+				provisionedLoginId,
+				request.getPasswordHash() == null ? passwordEncoder.encode(provisionedTempPassword) : request.getPasswordHash(),
 				request.getRequesterName(),
 				request.getRole() == SignupRole.TEACHER ? Role.TEACHER : Role.STUDENT
 			);
 			authUserRepository.save(user);
-			request.approve(reviewer.userId());
+			request.approve(reviewer.userId(), provisionedLoginId, provisionedTempPassword);
 			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(reviewer.schoolId(), request.getId(), reviewer.userId(), "APPROVED", null));
 		} else {
 			request.reject(reviewer.userId(), rejectionReason);

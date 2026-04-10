@@ -44,6 +44,8 @@ create table signup_requests (
     consent_privacy boolean not null,
     consent_student_notice boolean not null,
     rejection_reason varchar(1000),
+    provisioned_login_id varchar(100),
+    provisioned_temp_password varchar(255),
     created_at timestamp not null,
     reviewed_at timestamp,
     reviewed_by varchar(64),

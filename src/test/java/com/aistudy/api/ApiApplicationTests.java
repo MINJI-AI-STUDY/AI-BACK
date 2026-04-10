@@ -3,6 +3,7 @@ package com.aistudy.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.nullValue;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -592,7 +593,9 @@ class ApiApplicationTests {
 					""")
 		)
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.status").value("APPROVED"));
+			.andExpect(jsonPath("$.status").value("APPROVED"))
+			.andExpect(jsonPath("$.provisionedLoginId").value("approved-teacher"))
+			.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
 	}
 
 	private String teacherAccessToken() throws Exception {
