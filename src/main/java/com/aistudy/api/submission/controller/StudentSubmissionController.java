@@ -29,22 +29,19 @@ public class StudentSubmissionController {
 		this.submissionService = submissionService;
 	}
 
-	/** 학생에게 공개된 문제 세트를 반환합니다. */
 	@GetMapping("/question-sets/{distributionCode}")
 	public StudentQuestionSetResponse getQuestionSet(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String distributionCode) {
-		authService.requireRole(authorizationHeader, Role.STUDENT);
-		return submissionService.getQuestionSet(distributionCode);
+		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
+		return submissionService.getQuestionSet(distributionCode, student.schoolId());
 	}
 
-	/** 학생 제출을 저장하고 자동 채점합니다. */
 	@PostMapping("/question-sets/{distributionCode}/submissions")
 	public SubmissionResponse submit(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String distributionCode, @Valid @RequestBody SubmitQuestionSetRequest request) {
 		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
-		Submission submission = submissionService.submit(student.userId(), distributionCode, request);
+		Submission submission = submissionService.submit(student.userId(), student.schoolId(), distributionCode, request);
 		return SubmissionResponse.from(submission);
 	}
 
-	/** 학생 본인의 결과와 해설을 반환합니다. */
 	@GetMapping("/submissions/{submissionId}/result")
 	public StudentResultResponse result(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String submissionId) {
 		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);

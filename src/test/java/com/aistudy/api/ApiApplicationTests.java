@@ -77,7 +77,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void PDF_업로드_성공을_반환한다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String token = mockMvc.perform(
 			post("/api/auth/login")
@@ -110,7 +110,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void PDF_아닌_파일은_거부한다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String token = mockMvc.perform(
 			post("/api/auth/login")
@@ -142,7 +142,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 실패한_자료만_재처리할_수_있다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenThrow(new RuntimeException("AI 실패"));
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenThrow(new RuntimeException("AI 실패"));
 
 		String token = mockMvc.perform(
 			post("/api/auth/login")
@@ -173,7 +173,7 @@ class ApiApplicationTests {
 
 		String materialId = uploadResponse.replaceAll(".*\"materialId\":\"([^\"]+)\".*", "$1");
 		reset(aiIntegrationService);
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("재처리 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("재처리 완료 텍스트");
 
 		mockMvc.perform(
 			post("/api/teacher/materials/" + materialId + "/retry")
@@ -188,7 +188,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 문제_세트_생성을_반환한다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String accessToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(accessToken, "문제 생성 자료", "설명");
@@ -212,7 +212,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 배포_가능한_문항이_없으면_배포를_거부한다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String accessToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(accessToken, "배포 차단 자료", "설명");
@@ -261,7 +261,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 생성_결과_수가_요청_수와_다르면_거부한다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String accessToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(accessToken, "생성 수 검증 자료", "설명");
@@ -282,7 +282,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 학생이_문제를_제출하고_결과를_조회할_수_있다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String teacherToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(teacherToken, "학생 제출 자료", "설명");
@@ -350,7 +350,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 이미_제출한_세트는_다시_제출할_수_없다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String teacherToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(teacherToken, "중복 제출 자료", "설명");
@@ -407,7 +407,7 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 교사와_운영자가_대시보드를_조회할_수_있다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("추출 완료 텍스트");
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("추출 완료 텍스트");
 
 		String teacherToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(teacherToken, "대시보드 자료", "설명");
@@ -468,8 +468,8 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void 학생이_자료기반_질문을_할_수_있다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("자료 핵심 개념 설명");
-		when(aiIntegrationService.ask(anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("자료 기반 답변입니다.", List.of("자료 핵심 개념 설명"), true, false));
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("자료 핵심 개념 설명");
+		when(aiIntegrationService.ask(anyString(), anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("자료 기반 답변입니다.", List.of("자료 핵심 개념 설명"), true, false));
 
 		String teacherToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(teacherToken, "질의응답 자료", "설명");
@@ -493,8 +493,8 @@ class ApiApplicationTests {
 	 */
 	@Test
 	void AI_실패시_fallback_답변을_반환한다() throws Exception {
-		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString())).thenReturn("자료 핵심 개념 설명");
-		when(aiIntegrationService.ask(anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("AI 실패", List.of(), false, true));
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("자료 핵심 개념 설명");
+		when(aiIntegrationService.ask(anyString(), anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("AI 실패", List.of(), false, true));
 
 		String teacherToken = teacherAccessToken();
 		String materialId = uploadReadyMaterial(teacherToken, "fallback 자료", "설명");
@@ -509,8 +509,9 @@ class ApiApplicationTests {
 					""")
 		)
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.grounded").value(true))
-			.andExpect(jsonPath("$.insufficientEvidence").value(false));
+			.andExpect(jsonPath("$.grounded").value(false))
+			.andExpect(jsonPath("$.insufficientEvidence").value(true))
+			.andExpect(jsonPath("$.answer").value("AI 실패"));
 	}
 
 	private String teacherAccessToken() throws Exception {

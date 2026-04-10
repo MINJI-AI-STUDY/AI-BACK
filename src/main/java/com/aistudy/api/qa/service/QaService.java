@@ -5,49 +5,59 @@ import com.aistudy.api.material.model.Material;
 import com.aistudy.api.material.service.MaterialService;
 import com.aistudy.api.qa.dto.QaResponse;
 import com.aistudy.api.qa.model.QALog;
+import com.aistudy.api.qa.repository.QALogRepository;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class QaService {
-	private final Map<String, QALog> logs = new ConcurrentHashMap<>();
+	private final QALogRepository qaLogRepository;
 	private final MaterialService materialService;
 	private final AiIntegrationService aiIntegrationService;
 
-	public QaService(MaterialService materialService, AiIntegrationService aiIntegrationService) {
+	public QaService(QALogRepository qaLogRepository, MaterialService materialService, AiIntegrationService aiIntegrationService) {
+		this.qaLogRepository = qaLogRepository;
 		this.materialService = materialService;
 		this.aiIntegrationService = aiIntegrationService;
 	}
 
-	/** 자료 기반 질문을 AI에 전달하고 로그를 저장합니다. */
-	public QaResponse ask(String studentId, String materialId, String question) {
-		Material material = materialService.getById(materialId);
-		QaResponse response = aiIntegrationService.ask(material.getTitle() + "\n" + material.getExtractedText() + "\n질문: " + question);
+	@Transactional
+	public QaResponse ask(String studentId, String schoolId, String materialId, String question) {
+		Material material = materialService.getSchoolMaterial(schoolId, materialId);
+		QaResponse response = aiIntegrationService.ask(material.getExtractedText(), question);
 		String status = response.insufficientEvidence() ? "INSUFFICIENT_EVIDENCE" : "SUCCESS";
-		if (!response.grounded()) {
-			response = new QaResponse(
-				material.getTitle() + " 자료 기준 기본 답변입니다: " + question,
-				List.of(material.getExtractedText()),
-				true,
-				false
-			);
-			status = "FALLBACK";
-		}
-		QALog log = new QALog(
-			"qa-" + UUID.randomUUID(),
+		qaLogRepository.save(new QALog(
+			UUID.randomUUID().toString(),
+			schoolId,
 			materialId,
 			studentId,
 			question,
 			response.answer(),
 			response.grounded(),
 			status,
-			LocalDateTime.now()
-		);
-		logs.put(log.getId(), log);
+			LocalDateTime.now(),
+			response.evidenceSnippets()
+		));
 		return response;
+	}
+
+	@Transactional(readOnly = true)
+	public List<QALog> getStudentLogs(String schoolId, String materialId, String studentId) {
+		materialService.getSchoolMaterial(schoolId, materialId);
+		return qaLogRepository.findByMaterialIdAndStudentIdOrderByCreatedAtDesc(materialId, studentId);
+	}
+
+	@Transactional(readOnly = true)
+	public List<QALog> getTeacherLogs(String schoolId, String materialId) {
+		materialService.getSchoolMaterial(schoolId, materialId);
+		return qaLogRepository.findByMaterialIdAndSchoolIdOrderByCreatedAtDesc(materialId, schoolId);
+	}
+
+	@Transactional(readOnly = true)
+	public long countByMaterial(String schoolId, String materialId) {
+		return qaLogRepository.countByMaterialIdAndSchoolId(materialId, schoolId);
 	}
 }
