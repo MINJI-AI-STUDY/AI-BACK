@@ -310,7 +310,13 @@ class ApiApplicationTests {
 		String publishResponse = mockMvc.perform(
 			post("/api/teacher/question-sets/" + questionSetId + "/publish")
 				.header("Authorization", "Bearer " + teacherToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"dueAt":"2030-12-31T23:59:00"}
+					""")
 		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.dueAt").value("2030-12-31T23:59:00"))
 			.andReturn().getResponse().getContentAsString();
 
 		String distributionCode = publishResponse.replaceAll(".*\"distributionCode\":\"([^\"]+)\".*", "$1");
