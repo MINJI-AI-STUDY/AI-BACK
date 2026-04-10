@@ -3,6 +3,7 @@ package com.aistudy.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.nullValue;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -518,6 +519,83 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.grounded").value(false))
 			.andExpect(jsonPath("$.insufficientEvidence").value(true))
 			.andExpect(jsonPath("$.answer").value("AI 실패"));
+	}
+
+	@Test
+	void 학교_검색과_교직원_가입요청_생성을_반환한다() throws Exception {
+		mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/signup/schools")
+				.param("keyword", "A고")
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].schoolId").value("school-a"));
+
+		mockMvc.perform(
+			post("/api/signup/teacher")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "schoolId":"school-a",
+					  "displayName":"신규 교사",
+					  "loginId":"new-teacher",
+					  "password":"teacher123",
+					  "schoolEmail":"teacher@a-hs.kr",
+					  "consentTerms":true,
+					  "consentPrivacy":true,
+					  "consentStudentNotice":true
+					}
+					""")
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.schoolId").value("school-a"))
+			.andExpect(jsonPath("$.status").value("PENDING"));
+	}
+
+	@Test
+	void 학교운영자가_가입요청을_승인할_수_있다() throws Exception {
+		mockMvc.perform(
+			post("/api/signup/teacher")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "schoolId":"school-a",
+					  "displayName":"승인 교사",
+					  "loginId":"approved-teacher",
+					  "password":"teacher123",
+					  "schoolEmail":"teacher2@a-hs.kr",
+					  "consentTerms":true,
+					  "consentPrivacy":true,
+					  "consentStudentNotice":true
+					}
+					""")
+		)
+			.andExpect(status().isOk());
+
+		String operatorToken = operatorAccessToken();
+		String pendingPayload = mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/signup/requests/pending")
+				.param("schoolId", "school-a")
+				.header("Authorization", "Bearer " + operatorToken)
+		)
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		String signupRequestId = pendingPayload.replaceAll(".*\"signupRequestId\":\"([^\"]+)\".*", "$1");
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.patch("/api/signup/requests/" + signupRequestId)
+				.header("Authorization", "Bearer " + operatorToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"approve":true,"rejectionReason":null}
+					""")
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("APPROVED"))
+			.andExpect(jsonPath("$.provisionedLoginId").value("approved-teacher"))
+			.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
 	}
 
 	private String teacherAccessToken() throws Exception {
