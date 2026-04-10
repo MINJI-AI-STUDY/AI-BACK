@@ -26,7 +26,8 @@
 ### Response
 ```json
 {
-  "accessToken": "dGVhY2hlcg==",
+  "accessToken": "jwt-access-token",
+  "refreshToken": "refresh-token",
   "role": "TEACHER",
   "displayName": "교사 데모"
 }
@@ -51,7 +52,39 @@
 ```json
 {
   "userId": "teacher-1",
+  "schoolId": "school-a",
+  "classroomId": "class-a",
   "role": "TEACHER",
   "displayName": "교사 데모"
+}
+```
+
+## 3. 토큰 재발급
+- `POST /api/auth/refresh`
+
+### Request Body
+```json
+{
+  "refreshToken": "refresh-token"
+}
+```
+
+### Response
+```json
+{
+  "accessToken": "jwt-access-token",
+  "refreshToken": "new-refresh-token",
+  "role": "TEACHER",
+  "displayName": "교사 데모"
+}
+```
+
+## 4. 로그아웃
+- `POST /api/auth/logout`
+
+### Request Body
+```json
+{
+  "refreshToken": "refresh-token"
 }
 ```
