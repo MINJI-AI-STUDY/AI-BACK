@@ -13,6 +13,8 @@ import com.aistudy.api.auth.AuthService;
 import com.aistudy.api.auth.AuthUserEntity;
 import com.aistudy.api.auth.AuthUserRepository;
 import com.aistudy.api.auth.Role;
+import com.aistudy.api.signup.dto.SchoolMasterSyncResponse;
+import com.aistudy.api.signup.service.SchoolMasterSyncService;
 import java.util.List;
 import jakarta.validation.Valid;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,13 +36,15 @@ public class AdminDirectoryController {
 	private final ClassroomRepository classroomRepository;
 	private final AuthUserRepository authUserRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final SchoolMasterSyncService schoolMasterSyncService;
 
-	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder) {
+	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, SchoolMasterSyncService schoolMasterSyncService) {
 		this.authService = authService;
 		this.schoolRepository = schoolRepository;
 		this.classroomRepository = classroomRepository;
 		this.authUserRepository = authUserRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.schoolMasterSyncService = schoolMasterSyncService;
 	}
 
 	@GetMapping("/schools")
@@ -115,5 +119,11 @@ public class AdminDirectoryController {
 			user.updatePassword(passwordEncoder.encode(request.password()));
 		}
 		return AdminUserResponse.from(authUserRepository.save(user));
+	}
+
+	@PostMapping("/schools/sync-master")
+	public SchoolMasterSyncResponse syncSchoolMaster(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
+		authService.requireRole(authorizationHeader, Role.OPERATOR);
+		return schoolMasterSyncService.syncAll();
 	}
 }

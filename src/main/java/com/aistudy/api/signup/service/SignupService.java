@@ -53,9 +53,6 @@ public class SignupService {
 	public SignupRequestEntity requestTeacherSignup(CreateTeacherSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
-		if (school.getEmailDomain() != null && !request.schoolEmail().endsWith("@" + school.getEmailDomain())) {
-			throw new BadRequestException("학교 이메일 도메인이 일치하지 않습니다.");
-		}
 		return signupRequestRepository.save(new SignupRequestEntity(
 			request.schoolId(),
 			null,
