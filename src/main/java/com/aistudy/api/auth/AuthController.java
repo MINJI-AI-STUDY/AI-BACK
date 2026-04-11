@@ -27,6 +27,12 @@ public class AuthController {
 		return authService.login(request);
 	}
 
+	/** 학생 PIN 로그인 — 학교 범위 내 학생 코드와 PIN으로 인증합니다. */
+	@PostMapping("/student/login")
+	public StudentLoginResponse studentLogin(@Valid @RequestBody StudentLoginRequest request) {
+		return authService.studentLogin(request);
+	}
+
 	@PostMapping("/refresh")
 	public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
 		return authService.refresh(request);

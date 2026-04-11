@@ -598,6 +598,121 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
 	}
 
+	@Test
+	void 학교운영자_학교목록을_조회할_수_있다() throws Exception {
+		String operatorToken = operatorAccessToken();
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/operator/schools")
+				.header("Authorization", "Bearer " + operatorToken)
+		)
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].schoolId").value("school-a"));
+	}
+
+	/**
+	 * 학생 PIN 로그인 성공 계약을 고정합니다.
+	 */
+	@Test
+	void 학생_PIN_로그인_성공을_반환한다() throws Exception {
+		mockMvc.perform(
+			post("/api/auth/student/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"schoolId":"school-a","studentName":"학생 목업","pin":"student123"}
+					"""))
+		.andExpect(status().isOk())
+		.andExpect(jsonPath("$.accessToken").isNotEmpty())
+		.andExpect(jsonPath("$.role").value("STUDENT"))
+		.andExpect(jsonPath("$.displayName").value("학생 목업"))
+		.andExpect(jsonPath("$.schoolId").value("school-a"));
+	}
+
+	/**
+	 * 학생 PIN 로그인 실패 계약을 고정합니다.
+	 */
+	@Test
+	void 학생_PIN_로그인_실패시_401을_반환한다() throws Exception {
+		mockMvc.perform(
+			post("/api/auth/student/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"schoolId":"school-a","studentName":"학생 목업","pin":"wrong-pin"}
+					"""))
+		.andExpect(status().isUnauthorized())
+		.andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
+	}
+
+	/**
+	 * 학생 가입요청에 PIN이 포함되어야 합니다.
+	 */
+	@Test
+	void 학생_가입요청에_PIN이_포함된다() throws Exception {
+		mockMvc.perform(
+			post("/api/signup/student")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "schoolId":"school-a",
+					  "classroomId":"class-a",
+					  "realName":"테스트 학생",
+					  "pin":"1234",
+					  "consentTerms":true,
+					  "consentPrivacy":true,
+					  "consentStudentNotice":true
+					}
+					"""))
+		.andExpect(status().isOk())
+		.andExpect(jsonPath("$.schoolId").value("school-a"))
+		.andExpect(jsonPath("$.status").value("PENDING"));
+	}
+
+	/**
+	 * 학생 승인 시 provisionedTempPassword가 노출되지 않아야 합니다.
+	 */
+	@Test
+	void 학생_승인시_임시비밀번호가_노출되지_않는다() throws Exception {
+		mockMvc.perform(
+			post("/api/signup/student")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "schoolId":"school-a",
+					  "classroomId":"class-a",
+					  "realName":"PIN 학생",
+					  "pin":"5678",
+					  "consentTerms":true,
+					  "consentPrivacy":true,
+					  "consentStudentNotice":true
+					}
+					"""))
+		.andExpect(status().isOk());
+
+		String operatorToken = operatorAccessToken();
+		String pendingPayload = mockMvc.perform(
+			MockMvcRequestBuilders.get("/api/signup/requests/pending")
+				.param("schoolId", "school-a")
+				.header("Authorization", "Bearer " + operatorToken)
+		)
+		.andExpect(status().isOk())
+		.andReturn()
+		.getResponse()
+		.getContentAsString();
+
+		String signupRequestId = pendingPayload.replaceAll(".*\"signupRequestId\":\"([^\"]+)\".*", "$1");
+
+		mockMvc.perform(
+			MockMvcRequestBuilders.patch("/api/signup/requests/" + signupRequestId)
+				.header("Authorization", "Bearer " + operatorToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"approve":true,"rejectionReason":null}
+					"""))
+		.andExpect(status().isOk())
+		.andExpect(jsonPath("$.status").value("APPROVED"))
+		.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
+	}
+
 	private String teacherAccessToken() throws Exception {
 		return mockMvc.perform(
 			post("/api/auth/login")
@@ -614,16 +729,17 @@ class ApiApplicationTests {
 
 	private String studentAccessToken() throws Exception {
 		return mockMvc.perform(
-			post("/api/auth/login")
+			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"mock-student","password":"student123"}
+					{"schoolId":"school-a","studentName":"학생 목업","pin":"student123"}
 					""")
 		)
-			.andReturn()
-			.getResponse()
-			.getContentAsString()
-			.replaceAll(".*\"accessToken\":\"([^\"]+)\".*", "$1");
+		.andExpect(status().isOk())
+		.andReturn()
+		.getResponse()
+		.getContentAsString()
+		.replaceAll(".*\"accessToken\":\"([^\"]+)\".*", "$1");
 	}
 
 	private String operatorAccessToken() throws Exception {

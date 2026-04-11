@@ -21,6 +21,12 @@ public class School {
 	protected School() {
 	}
 
+	public School(String id, String name, boolean active) {
+		this.id = id;
+		this.name = name;
+		this.active = active;
+	}
+
 	public School(String name) {
 		this.id = UUID.randomUUID().toString();
 		this.name = name;

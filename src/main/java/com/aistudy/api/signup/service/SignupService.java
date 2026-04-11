@@ -54,6 +54,7 @@ public class SignupService {
 	public SignupRequestEntity requestTeacherSignup(CreateTeacherSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
+		if (authUserRepository.findByLoginId(request.loginId()).isPresent()) throw new BadRequestException("이미 사용 중인 로그인 ID입니다.");
 		return signupRequestRepository.save(new SignupRequestEntity(
 			request.schoolId(),
 			null,
@@ -69,11 +70,14 @@ public class SignupService {
 		));
 	}
 
-	/** 학생 가입 요청 — 학교 활성 여부 및 학급-학교 소속 일치를 검증합니다. */
+	/** 학생 가입 요청 — 학교 활성 여부 및 학급-학교 소속 일치를 검증합니다. PIN을 해시하여 저장합니다. */
 	@Transactional
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
+		if (authUserRepository.findBySchoolIdAndDisplayNameAndRole(request.schoolId(), request.realName(), Role.STUDENT).isPresent()) {
+			throw new BadRequestException("같은 학교에 동일한 이름의 학생 계정이 이미 존재합니다.");
+		}
 		if (request.classroomId() != null && !request.classroomId().isBlank()) {
 			classroomRepository.findByIdAndSchoolId(request.classroomId(), request.schoolId())
 				.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
@@ -83,7 +87,7 @@ public class SignupService {
 			request.classroomId(),
 			request.realName(),
 			null,
-			null,
+			passwordEncoder.encode(request.pin()),  // PIN 해시를 passwordHash 필드에 저장
 			SignupRole.STUDENT,
 			null,
 			request.realName(),
@@ -105,18 +109,41 @@ public class SignupService {
 		ensureSchoolOperator(reviewer, request.getSchoolId());
 		if (request.getStatus() != SignupStatus.PENDING) throw new BadRequestException("이미 처리된 가입 요청입니다.");
 		if (approve) {
-			String provisionedLoginId = request.getLoginId() == null ? "student-" + request.getId().substring(0, 8) : request.getLoginId();
-			String provisionedTempPassword = request.getPasswordHash() == null ? "student123" : null;
-			AuthUserEntity user = new AuthUserEntity(
-				request.getSchoolId(),
-				request.getClassroomId(),
-				provisionedLoginId,
-				request.getPasswordHash() == null ? passwordEncoder.encode(provisionedTempPassword) : request.getPasswordHash(),
-				request.getRequesterName(),
-				request.getRole() == SignupRole.TEACHER ? Role.TEACHER : Role.STUDENT
-			);
-			authUserRepository.save(user);
-			request.approve(reviewer.userId(), provisionedLoginId, provisionedTempPassword);
+			if (request.getRole() == SignupRole.STUDENT) {
+				if (authUserRepository.findBySchoolIdAndDisplayNameAndRole(request.getSchoolId(), request.getRequesterName(), Role.STUDENT).isPresent()) {
+					throw new BadRequestException("같은 학교에 동일한 이름의 학생 계정이 이미 존재합니다.");
+				}
+				// 학생 승인: PIN 기반 인증, 임시 비밀번호 생성 없음
+				String provisionedLoginId = "student-" + request.getId().substring(0, 8);
+				String placeholderPassword = passwordEncoder.encode(java.util.UUID.randomUUID().toString());
+				AuthUserEntity user = new AuthUserEntity(
+					request.getSchoolId(),
+					request.getClassroomId(),
+					provisionedLoginId,
+					placeholderPassword,
+					request.getRequesterName(),
+					Role.STUDENT,
+					request.getPasswordHash()  // PIN 해시를 pin 필드로 이관
+				);
+				authUserRepository.save(user);
+				request.approve(reviewer.userId(), provisionedLoginId);  // 임시 비밀번호 없음
+			} else {
+				// 교사/운영자 승인: 기존 비밀번호 기반 인증 유지
+				String provisionedLoginId = request.getLoginId();
+				if (authUserRepository.findByLoginId(provisionedLoginId).isPresent()) {
+					throw new BadRequestException("이미 사용 중인 로그인 ID입니다.");
+				}
+				AuthUserEntity user = new AuthUserEntity(
+					request.getSchoolId(),
+					request.getClassroomId(),
+					provisionedLoginId,
+					request.getPasswordHash(),
+					request.getRequesterName(),
+					Role.TEACHER
+				);
+				authUserRepository.save(user);
+				request.approve(reviewer.userId(), provisionedLoginId, null);
+			}
 			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(request.getSchoolId(), request.getId(), reviewer.userId(), "APPROVED", null));
 		} else {
 			request.reject(reviewer.userId(), rejectionReason);

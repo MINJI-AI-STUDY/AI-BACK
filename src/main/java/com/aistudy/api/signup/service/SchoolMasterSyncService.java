@@ -1,5 +1,7 @@
 package com.aistudy.api.signup.service;
 
+import com.aistudy.api.admin.School;
+import com.aistudy.api.admin.SchoolRepository;
 import com.aistudy.api.common.BadRequestException;
 import com.aistudy.api.signup.dto.SchoolMasterSyncResponse;
 import com.aistudy.api.signup.model.SchoolMasterEntity;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SchoolMasterSyncService {
 	private static final Logger log = LoggerFactory.getLogger(SchoolMasterSyncService.class);
 	private final SchoolMasterRepository schoolMasterRepository;
+	private final SchoolRepository schoolRepository;
 	private final ObjectMapper objectMapper;
 	private final String baseUrl;
 	private final String apiKey;
@@ -35,6 +38,7 @@ public class SchoolMasterSyncService {
 
 	public SchoolMasterSyncService(
 		SchoolMasterRepository schoolMasterRepository,
+		SchoolRepository schoolRepository,
 		ObjectMapper objectMapper,
 		@Value("${app.school-api.base-url}") String baseUrl,
 		@Value("${app.school-api.key}") String apiKey,
@@ -42,6 +46,7 @@ public class SchoolMasterSyncService {
 		@Value("${app.school-api.page-size}") int pageSize
 	) {
 		this.schoolMasterRepository = schoolMasterRepository;
+		this.schoolRepository = schoolRepository;
 		this.objectMapper = objectMapper;
 		this.baseUrl = baseUrl;
 		this.apiKey = apiKey;
@@ -73,9 +78,11 @@ public class SchoolMasterSyncService {
 					SchoolMasterEntity entity = existing.get();
 					entity.updateFromApi(name, level, address, region, emailDomain, true);
 					schoolMasterRepository.save(entity);
+					syncTenantSchool(entity);
 					updated++;
 				} else {
-					schoolMasterRepository.save(new SchoolMasterEntity(schoolCode, name, level, address, region, emailDomain, true));
+					SchoolMasterEntity created = schoolMasterRepository.save(new SchoolMasterEntity(schoolCode, name, level, address, region, emailDomain, true));
+					syncTenantSchool(created);
 					imported++;
 				}
 			}
@@ -123,6 +130,13 @@ public class SchoolMasterSyncService {
 		if (schoolName == null || schoolName.isBlank()) return null;
 		String normalized = schoolName.replaceAll("\\s+", "").toLowerCase();
 		return normalized + ".school.kr";
+	}
+
+	private void syncTenantSchool(SchoolMasterEntity schoolMaster) {
+		School school = schoolRepository.findById(schoolMaster.getId())
+			.orElseGet(() -> schoolRepository.findByName(schoolMaster.getName()).orElse(new School(schoolMaster.getId(), schoolMaster.getName(), schoolMaster.isActive())));
+		school.update(schoolMaster.getName(), schoolMaster.isActive());
+		schoolRepository.save(school);
 	}
 
 	@SuppressWarnings("unchecked")

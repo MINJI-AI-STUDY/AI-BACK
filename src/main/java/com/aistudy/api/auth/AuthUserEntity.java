@@ -35,6 +35,10 @@ public class AuthUserEntity {
 	@Column(nullable = false)
 	private Role role;
 
+	/** 학생 PIN 인증용 해시 (교사/운영자는 null) */
+	@Column(name = "pin")
+	private String pin;
+
 	@Column(nullable = false)
 	private boolean active;
 
@@ -45,6 +49,11 @@ public class AuthUserEntity {
 	}
 
 	public AuthUserEntity(String schoolId, String classroomId, String loginId, String password, String displayName, Role role) {
+		this(schoolId, classroomId, loginId, password, displayName, role, null);
+	}
+
+	/** 학생 PIN 포함 생성자 — 교사/운영자는 pin=null로 위 생성자 사용 */
+	public AuthUserEntity(String schoolId, String classroomId, String loginId, String password, String displayName, Role role, String pin) {
 		this.id = UUID.randomUUID().toString();
 		this.schoolId = schoolId;
 		this.classroomId = classroomId;
@@ -52,6 +61,7 @@ public class AuthUserEntity {
 		this.password = password;
 		this.displayName = displayName;
 		this.role = role;
+		this.pin = pin;
 		this.active = true;
 	}
 
@@ -70,6 +80,7 @@ public class AuthUserEntity {
 	public String getDisplayName() { return displayName; }
 	public Role getRole() { return role; }
 	public boolean isActive() { return active; }
+	public String getPin() { return pin; }
 	public LocalDateTime getCreatedAt() { return createdAt; }
 
 	public AuthUser toAuthUser() {

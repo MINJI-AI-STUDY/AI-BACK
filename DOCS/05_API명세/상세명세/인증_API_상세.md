@@ -38,6 +38,43 @@
 | --- | --- | --- |
 | AUTH_UNAUTHORIZED | 401 | 로그인 정보 불일치 |
 
+## 1-1. 학생 PIN 로그인
+
+### 메서드 / URL
+- `POST /api/auth/student/login`
+
+### Request Header
+| key | value |
+| --- | --- |
+| Content-Type | application/json |
+
+### Request Body
+| key | 타입 | 설명 | 필수 |
+| --- | --- | --- | --- |
+| schoolId | string | 학교 ID | Y |
+| studentName | string | 학생 실명 | Y |
+| pin | string | 학생 PIN | Y |
+
+```json
+{
+  "schoolId": "school-a",
+  "studentName": "학생 목업",
+  "pin": "student123"
+}
+```
+
+### Response
+```json
+{
+  "accessToken": "jwt-access-token",
+  "refreshToken": "refresh-token",
+  "role": "STUDENT",
+  "displayName": "학생 목업",
+  "schoolId": "school-a",
+  "classroomId": "class-a"
+}
+```
+
 ## 2. 현재 사용자 조회
 
 ### 메서드 / URL

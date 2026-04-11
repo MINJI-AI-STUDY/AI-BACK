@@ -119,6 +119,11 @@ public class SignupRequestEntity {
 		this.provisionedTempPassword = provisionedTempPassword;
 	}
 
+	/** 학생 승인용 오버로드 — 임시 비밀번호 없이 승인 처리 */
+	public void approve(String reviewerUserId, String provisionedLoginId) {
+		approve(reviewerUserId, provisionedLoginId, null);
+	}
+
 	public void reject(String reviewerUserId, String rejectionReason) {
 		this.status = SignupStatus.REJECTED;
 		this.reviewedBy = reviewerUserId;
