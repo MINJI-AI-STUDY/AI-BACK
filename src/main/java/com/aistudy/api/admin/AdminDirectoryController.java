@@ -17,7 +17,9 @@ import com.aistudy.api.auth.Role;
 import com.aistudy.api.common.ForbiddenException;
 import com.aistudy.api.common.NotFoundException;
 import com.aistudy.api.signup.dto.SchoolMasterSyncResponse;
+import com.aistudy.api.signup.model.SchoolMasterEntity;
 import com.aistudy.api.signup.model.SchoolOperatorMembershipEntity;
+import com.aistudy.api.signup.repository.SchoolMasterRepository;
 import com.aistudy.api.signup.repository.SchoolOperatorMembershipRepository;
 import com.aistudy.api.signup.service.SchoolMasterSyncService;
 import java.util.List;
@@ -43,15 +45,17 @@ public class AdminDirectoryController {
 	private final AuthUserRepository authUserRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final SchoolMasterSyncService schoolMasterSyncService;
+	private final SchoolMasterRepository schoolMasterRepository;
 	private final SchoolOperatorMembershipRepository schoolOperatorMembershipRepository;
 
-	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, SchoolMasterSyncService schoolMasterSyncService, SchoolOperatorMembershipRepository schoolOperatorMembershipRepository) {
+	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, SchoolMasterSyncService schoolMasterSyncService, SchoolMasterRepository schoolMasterRepository, SchoolOperatorMembershipRepository schoolOperatorMembershipRepository) {
 		this.authService = authService;
 		this.schoolRepository = schoolRepository;
 		this.classroomRepository = classroomRepository;
 		this.authUserRepository = authUserRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.schoolMasterSyncService = schoolMasterSyncService;
+		this.schoolMasterRepository = schoolMasterRepository;
 		this.schoolOperatorMembershipRepository = schoolOperatorMembershipRepository;
 	}
 
@@ -59,8 +63,12 @@ public class AdminDirectoryController {
 	@GetMapping("/schools")
 	public List<SchoolResponse> getSchools(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
 		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
-		List<String> managedSchoolIds = getManagedSchoolIds(operator.userId());
-		return schoolRepository.findAllById(managedSchoolIds).stream().map(SchoolResponse::from).toList();
+		List<String> managedSchoolIds = getManagedSchoolIds(operator);
+		List<SchoolResponse> schools = schoolRepository.findAllById(managedSchoolIds).stream().map(SchoolResponse::from).toList();
+		if (!schools.isEmpty() || managedSchoolIds.isEmpty()) {
+			return schools;
+		}
+		return schoolMasterRepository.findAllById(managedSchoolIds).stream().map(this::toSchoolResponse).toList();
 	}
 
 	/** 학교 생성 — 초기 설정 시 필요하며, 운영자 소속 학교로 등록됩니다. */
@@ -113,7 +121,7 @@ public class AdminDirectoryController {
 	@GetMapping("/users")
 	public List<AdminUserResponse> getUsers(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @RequestParam(required = false) String schoolId) {
 		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
-		List<String> managedSchoolIds = getManagedSchoolIds(operator.userId());
+		List<String> managedSchoolIds = getManagedSchoolIds(operator);
 		String effectiveSchoolId = (schoolId != null && !schoolId.isBlank()) ? schoolId : null;
 		if (effectiveSchoolId != null) {
 			ensureOperatorManagesSchool(operator.userId(), effectiveSchoolId);
@@ -170,15 +178,30 @@ public class AdminDirectoryController {
 	}
 
 	/** 운영자가 관리하는 학교 ID 목록을 반환합니다. */
-	private List<String> getManagedSchoolIds(String operatorUserId) {
-		return schoolOperatorMembershipRepository.findByUserIdAndActiveTrue(operatorUserId)
+	private List<String> getManagedSchoolIds(AuthUser operator) {
+		List<String> membershipSchoolIds = schoolOperatorMembershipRepository.findByUserIdAndActiveTrue(operator.userId())
 			.stream().map(SchoolOperatorMembershipEntity::getSchoolId).toList();
+		if (!membershipSchoolIds.isEmpty()) {
+			return membershipSchoolIds;
+		}
+		if (operator.schoolId() == null || operator.schoolId().isBlank()) {
+			return List.of();
+		}
+		return List.of(operator.schoolId());
 	}
 
 	/** 운영자가 해당 학교의 관리 권한이 있는지 검증합니다. */
 	private void ensureOperatorManagesSchool(String operatorUserId, String schoolId) {
+		AuthUserEntity operator = authUserRepository.findById(operatorUserId).orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다."));
+		if (schoolId != null && schoolId.equals(operator.getSchoolId())) {
+			return;
+		}
 		schoolOperatorMembershipRepository.findBySchoolIdAndUserIdAndActiveTrue(schoolId, operatorUserId)
 			.orElseThrow(() -> new ForbiddenException("해당 학교의 관리 권한이 없습니다."));
+	}
+
+	private SchoolResponse toSchoolResponse(SchoolMasterEntity schoolMaster) {
+		return new SchoolResponse(schoolMaster.getId(), schoolMaster.getName(), schoolMaster.isActive());
 	}
 
 	/** 사용자와 학급의 학교 소속이 일치하는지 검증합니다. */
