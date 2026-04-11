@@ -1,6 +1,7 @@
 package com.aistudy.api.auth;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
 	private final AuthService authService;
+	private final PrivacyService privacyService;
 
-	public AuthController(AuthService authService) {
+	public AuthController(AuthService authService, PrivacyService privacyService) {
 		this.authService = authService;
+		this.privacyService = privacyService;
 	}
 
 	/** 로그인 요청을 처리합니다. */
@@ -38,5 +41,22 @@ public class AuthController {
 	@GetMapping("/me")
 	public MeResponse me(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
 		return authService.me(authorizationHeader);
+	}
+
+	/** 현재 사용자의 개인정보 동의 상태를 조회합니다. */
+	@GetMapping("/me/privacy-consent")
+	public List<PrivacyConsentResponse> getPrivacyConsents(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
+		AuthUser user = authService.getCurrentUser(authorizationHeader);
+		return privacyService.getConsents(user.userId());
+	}
+
+	/** 개인정보 동의 상태를 기록합니다. */
+	@PostMapping("/me/privacy-consent")
+	public PrivacyConsentResponse recordPrivacyConsent(
+		@RequestHeader(name = "Authorization", required = false) String authorizationHeader,
+		@Valid @RequestBody UpdatePrivacyConsentRequest request
+	) {
+		AuthUser user = authService.getCurrentUser(authorizationHeader);
+		return privacyService.recordConsent(user.userId(), request.consentType(), request.consented());
 	}
 }
