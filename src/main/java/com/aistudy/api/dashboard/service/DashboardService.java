@@ -98,10 +98,14 @@ public class DashboardService {
 		);
 	}
 
-	/** 운영자 개요 — 학교 범위 내 데이터만 집계합니다. */
-	public OperatorOverviewResponse getOperatorOverview(String schoolId) {
-		List<Submission> submissions = submissionService.getBySchoolId(schoolId);
-		List<QuestionSet> questionSets = questionSetService.getBySchoolId(schoolId);
+	/** 운영자 개요 — 운영자가 관리하는 학교 목록 범위의 데이터만 집계합니다. */
+	public OperatorOverviewResponse getOperatorOverview(List<String> schoolIds) {
+		List<Submission> submissions = schoolIds.stream()
+			.flatMap(schoolId -> submissionService.getBySchoolId(schoolId).stream())
+			.toList();
+		List<QuestionSet> questionSets = schoolIds.stream()
+			.flatMap(schoolId -> questionSetService.getBySchoolId(schoolId).stream())
+			.toList();
 		double averageScore = submissions.stream().mapToInt(Submission::getScore).average().orElse(0);
 		long participatedSetCount = submissions.stream().map(Submission::getQuestionSetId).distinct().count();
 		long completedSetCount = submissions.stream().filter(submission -> submission.getScore() >= 0).map(Submission::getQuestionSetId).distinct().count();

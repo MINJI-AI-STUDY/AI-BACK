@@ -131,6 +131,7 @@ public class AdminDirectoryController {
 	public AdminUserResponse createUser(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @Valid @RequestBody CreateAdminUserRequest request) {
 		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
 		ensureOperatorManagesSchool(operator.userId(), request.schoolId());
+		ensureClassroomMatchesSchool(request.classroomId(), request.schoolId());
 		AuthUserEntity user = new AuthUserEntity(
 			request.schoolId(),
 			request.classroomId(),
@@ -139,7 +140,9 @@ public class AdminDirectoryController {
 			request.displayName(),
 			request.role()
 		);
-		return AdminUserResponse.from(authUserRepository.save(user));
+		AuthUserEntity savedUser = authUserRepository.save(user);
+		syncOperatorMembership(savedUser.getId(), request.schoolId(), request.role());
+		return AdminUserResponse.from(savedUser);
 	}
 
 	/** 사용자 수정 — 운영자는 자신이 관리하는 학교의 사용자만 수정할 수 있습니다. */
@@ -149,11 +152,14 @@ public class AdminDirectoryController {
 		AuthUserEntity user = authUserRepository.findById(userId).orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다."));
 		ensureOperatorManagesSchool(operator.userId(), user.getSchoolId());
 		ensureOperatorManagesSchool(operator.userId(), request.schoolId());
+		ensureClassroomMatchesSchool(request.classroomId(), request.schoolId());
 		user.update(request.schoolId(), request.classroomId(), request.displayName(), request.role(), request.active());
 		if (request.password() != null && !request.password().isBlank()) {
 			user.updatePassword(passwordEncoder.encode(request.password()));
 		}
-		return AdminUserResponse.from(authUserRepository.save(user));
+		AuthUserEntity savedUser = authUserRepository.save(user);
+		syncOperatorMembership(savedUser.getId(), request.schoolId(), request.role());
+		return AdminUserResponse.from(savedUser);
 	}
 
 	/** 학교 마스터 데이터 동기화 — 플랫폼 수준 작업으로 모든 운영자가 접근할 수 있습니다. */
@@ -173,5 +179,22 @@ public class AdminDirectoryController {
 	private void ensureOperatorManagesSchool(String operatorUserId, String schoolId) {
 		schoolOperatorMembershipRepository.findBySchoolIdAndUserIdAndActiveTrue(schoolId, operatorUserId)
 			.orElseThrow(() -> new ForbiddenException("해당 학교의 관리 권한이 없습니다."));
+	}
+
+	/** 사용자와 학급의 학교 소속이 일치하는지 검증합니다. */
+	private void ensureClassroomMatchesSchool(String classroomId, String schoolId) {
+		if (classroomId == null || classroomId.isBlank()) {
+			return;
+		}
+		classroomRepository.findByIdAndSchoolId(classroomId, schoolId)
+			.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
+	}
+
+	/** 운영자 역할 변경 시 사용자 schoolId 기준으로 membership을 동기화합니다. */
+	private void syncOperatorMembership(String userId, String schoolId, Role role) {
+		schoolOperatorMembershipRepository.deleteByUserId(userId);
+		if (role == Role.OPERATOR) {
+			schoolOperatorMembershipRepository.save(new SchoolOperatorMembershipEntity(schoolId, userId));
+		}
 	}
 }

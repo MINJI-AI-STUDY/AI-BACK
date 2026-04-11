@@ -117,10 +117,10 @@ public class SignupService {
 			);
 			authUserRepository.save(user);
 			request.approve(reviewer.userId(), provisionedLoginId, provisionedTempPassword);
-			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(reviewer.schoolId(), request.getId(), reviewer.userId(), "APPROVED", null));
+			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(request.getSchoolId(), request.getId(), reviewer.userId(), "APPROVED", null));
 		} else {
 			request.reject(reviewer.userId(), rejectionReason);
-			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(reviewer.schoolId(), request.getId(), reviewer.userId(), "REJECTED", rejectionReason));
+			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(request.getSchoolId(), request.getId(), reviewer.userId(), "REJECTED", rejectionReason));
 		}
 		return signupRequestRepository.save(request);
 	}

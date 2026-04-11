@@ -8,4 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface SchoolOperatorMembershipRepository extends JpaRepository<SchoolOperatorMembershipEntity, String> {
 	Optional<SchoolOperatorMembershipEntity> findBySchoolIdAndUserIdAndActiveTrue(String schoolId, String userId);
 	List<SchoolOperatorMembershipEntity> findByUserIdAndActiveTrue(String userId);
+	void deleteByUserId(String userId);
 }
