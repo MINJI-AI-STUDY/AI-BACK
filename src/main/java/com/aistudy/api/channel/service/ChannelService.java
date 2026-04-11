@@ -27,6 +27,7 @@ public class ChannelService {
 		this.channelPresenceService = channelPresenceService;
 	}
 
+	/** 학교 범위 내 채널 목록 조회 */
 	@Transactional(readOnly = true)
 	public List<Channel> list(String schoolId) {
 		return channelRepository.findBySchoolIdAndActiveTrueOrderBySortOrderAsc(schoolId);
@@ -37,17 +38,20 @@ public class ChannelService {
 		return list(schoolId).stream().findFirst().orElseThrow(() -> new NotFoundException("기본 채널을 찾을 수 없습니다."));
 	}
 
+	/** 학교 범위 내 채널 조회 — schoolId 불일치 시 404 */
 	@Transactional(readOnly = true)
 	public Channel get(String schoolId, String channelId) {
 		return channelRepository.findByIdAndSchoolId(channelId, schoolId)
 			.orElseThrow(() -> new NotFoundException("채널을 찾을 수 없습니다."));
 	}
 
+	/** 채널 생성 — 교사 소속 학교에 귀속 */
 	@Transactional
 	public Channel create(AuthUser teacher, String name, String description, int sortOrder) {
 		return channelRepository.save(new Channel(teacher.schoolId(), name, description, sortOrder, teacher.userId()));
 	}
 
+	/** 채널 수정 — 교사 소속 학교 범위 내 채널만 수정 가능 */
 	@Transactional
 	public Channel update(AuthUser teacher, String channelId, String name, String description, int sortOrder, boolean active) {
 		Channel channel = get(teacher.schoolId(), channelId);
@@ -55,6 +59,7 @@ public class ChannelService {
 		return channelRepository.save(channel);
 	}
 
+	/** 채널 워크스페이스 — 사용자 소속 학교 범위 내 채널만 접근 가능 */
 	@Transactional(readOnly = true)
 	public ChannelWorkspaceResponse workspace(AuthUser user, String channelId) {
 		Channel channel = get(user.schoolId(), channelId);
