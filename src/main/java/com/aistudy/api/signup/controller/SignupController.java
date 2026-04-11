@@ -31,27 +31,32 @@ public class SignupController {
 		this.authService = authService;
 	}
 
+	/** 학교 검색 — 가입 화면에서 선택 가능한 학교 마스터 목록을 반환합니다. */
 	@GetMapping("/schools")
 	public List<SchoolMasterResponse> searchSchools(@RequestParam(defaultValue = "") String keyword) {
 		return signupService.searchSchools(keyword).stream().map(SchoolMasterResponse::from).toList();
 	}
 
+	/** 교직원 가입 요청 생성 — 학교 활성 여부를 검증한 뒤 승인 대기 상태로 저장합니다. */
 	@PostMapping("/teacher")
 	public SignupRequestResponse requestTeacherSignup(@Valid @RequestBody CreateTeacherSignupRequest request) {
 		return SignupRequestResponse.from(signupService.requestTeacherSignup(request));
 	}
 
+	/** 학생 가입 요청 생성 — 학교 활성 여부와 학급-학교 소속을 검증한 뒤 승인 대기 상태로 저장합니다. */
 	@PostMapping("/student")
 	public SignupRequestResponse requestStudentSignup(@Valid @RequestBody CreateStudentSignupRequest request) {
 		return SignupRequestResponse.from(signupService.requestStudentSignup(request));
 	}
 
+	/** 가입 요청 목록 조회 — 운영자는 자신이 관리하는 학교의 대기 중인 요청만 볼 수 있습니다. */
 	@GetMapping("/requests/pending")
 	public List<SignupRequestResponse> pending(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @RequestParam String schoolId) {
 		AuthUser reviewer = authService.getCurrentUser(authorizationHeader);
 		return signupService.pendingRequests(reviewer, schoolId).stream().map(SignupRequestResponse::from).toList();
 	}
 
+	/** 가입 요청 승인/반려 — 운영자는 자신이 관리하는 학교의 요청만 처리할 수 있습니다. */
 	@PatchMapping("/requests/{signupRequestId}")
 	public SignupRequestResponse review(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String signupRequestId, @Valid @RequestBody ReviewSignupRequest request) {
 		AuthUser reviewer = authService.getCurrentUser(authorizationHeader);

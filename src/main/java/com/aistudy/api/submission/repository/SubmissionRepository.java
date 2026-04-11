@@ -10,4 +10,5 @@ public interface SubmissionRepository extends JpaRepository<Submission, String> 
 	List<Submission> findByMaterialIdAndSchoolId(String materialId, String schoolId);
 	long countDistinctByMaterialIdAndSchoolId(String materialId, String schoolId);
 	long countByMaterialIdAndSchoolId(String materialId, String schoolId);
+	List<Submission> findBySchoolId(String schoolId);
 }

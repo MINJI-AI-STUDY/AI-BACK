@@ -31,6 +31,7 @@ public class SubmissionService {
 		this.materialService = materialService;
 	}
 
+	/** 학생 문제 세트 조회 — 배포 코드와 학교 소속을 함께 검증합니다. */
 	@Transactional(readOnly = true)
 	public StudentQuestionSetResponse getQuestionSet(String distributionCode, String schoolId) {
 		QuestionSet questionSet = questionSetService.getPublishedByCode(distributionCode);
@@ -41,6 +42,7 @@ public class SubmissionService {
 		return StudentQuestionSetResponse.from(questionSet, title);
 	}
 
+	/** 학생 제출 처리 — 학교 소속, 중복 제출, 마감 여부를 검증한 뒤 채점 결과를 저장합니다. */
 	@Transactional
 	public Submission submit(String studentId, String schoolId, String distributionCode, SubmitQuestionSetRequest request) {
 		QuestionSet questionSet = questionSetService.getPublishedByCode(distributionCode);
@@ -91,6 +93,7 @@ public class SubmissionService {
 		return submissionRepository.save(submission);
 	}
 
+	/** 제출 결과 조회 — 제출자 본인에게만 결과를 반환합니다. */
 	@Transactional(readOnly = true)
 	public Submission getOwnedSubmission(String studentId, String submissionId) {
 		Submission submission = submissionRepository.findById(submissionId)
@@ -101,16 +104,25 @@ public class SubmissionService {
 		return submission;
 	}
 
+	/** 문제 세트 제출 목록 조회 — 교사 대시보드 집계를 위해 사용합니다. */
 	@Transactional(readOnly = true)
 	public List<Submission> getByQuestionSetId(String questionSetId) {
 		return submissionRepository.findByQuestionSetId(questionSetId);
 	}
 
+	/** 문서 기준 제출 목록 조회 — 학교 범위 내 제출만 반환합니다. */
 	@Transactional(readOnly = true)
 	public List<Submission> getByMaterialId(String schoolId, String materialId) {
 		return submissionRepository.findByMaterialIdAndSchoolId(materialId, schoolId);
 	}
 
+	/** 학교 범위 내 제출 목록을 반환합니다. */
+	@Transactional(readOnly = true)
+	public List<Submission> getBySchoolId(String schoolId) {
+		return submissionRepository.findBySchoolId(schoolId);
+	}
+
+	/** 전체 제출 목록 조회 — 기존 전역 관리/테스트 호환을 위해 유지합니다. */
 	@Transactional(readOnly = true)
 	public List<Submission> getAll() {
 		return submissionRepository.findAll();

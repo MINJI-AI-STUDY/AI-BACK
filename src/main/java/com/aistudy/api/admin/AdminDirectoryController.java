@@ -10,10 +10,15 @@ import com.aistudy.api.admin.dto.UpdateAdminUserRequest;
 import com.aistudy.api.admin.dto.UpdateClassroomRequest;
 import com.aistudy.api.admin.dto.UpdateSchoolRequest;
 import com.aistudy.api.auth.AuthService;
+import com.aistudy.api.auth.AuthUser;
 import com.aistudy.api.auth.AuthUserEntity;
 import com.aistudy.api.auth.AuthUserRepository;
 import com.aistudy.api.auth.Role;
+import com.aistudy.api.common.ForbiddenException;
+import com.aistudy.api.common.NotFoundException;
 import com.aistudy.api.signup.dto.SchoolMasterSyncResponse;
+import com.aistudy.api.signup.model.SchoolOperatorMembershipEntity;
+import com.aistudy.api.signup.repository.SchoolOperatorMembershipRepository;
 import com.aistudy.api.signup.service.SchoolMasterSyncService;
 import java.util.List;
 import jakarta.validation.Valid;
@@ -28,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 운영자 디렉토리 관리 — MVP: 운영자는 소속 학교 범위 내에서만 관리합니다. */
 @RestController
 @RequestMapping("/api/operator")
 public class AdminDirectoryController {
@@ -37,68 +43,95 @@ public class AdminDirectoryController {
 	private final AuthUserRepository authUserRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final SchoolMasterSyncService schoolMasterSyncService;
+	private final SchoolOperatorMembershipRepository schoolOperatorMembershipRepository;
 
-	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, SchoolMasterSyncService schoolMasterSyncService) {
+	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, SchoolMasterSyncService schoolMasterSyncService, SchoolOperatorMembershipRepository schoolOperatorMembershipRepository) {
 		this.authService = authService;
 		this.schoolRepository = schoolRepository;
 		this.classroomRepository = classroomRepository;
 		this.authUserRepository = authUserRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.schoolMasterSyncService = schoolMasterSyncService;
+		this.schoolOperatorMembershipRepository = schoolOperatorMembershipRepository;
 	}
 
+	/** 운영자가 관리하는 학교 목록을 반환합니다. */
 	@GetMapping("/schools")
 	public List<SchoolResponse> getSchools(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
-		return schoolRepository.findAll().stream().map(SchoolResponse::from).toList();
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		List<String> managedSchoolIds = getManagedSchoolIds(operator.userId());
+		return schoolRepository.findAllById(managedSchoolIds).stream().map(SchoolResponse::from).toList();
 	}
 
+	/** 학교 생성 — 초기 설정 시 필요하며, 운영자 소속 학교로 등록됩니다. */
 	@PostMapping("/schools")
 	public SchoolResponse createSchool(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @Valid @RequestBody CreateSchoolRequest request) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
-		return SchoolResponse.from(schoolRepository.save(new School(request.name())));
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		School school = schoolRepository.save(new School(request.name()));
+		schoolOperatorMembershipRepository.save(new SchoolOperatorMembershipEntity(school.getId(), operator.userId()));
+		return SchoolResponse.from(school);
 	}
 
+	/** 학교 정보 수정 — 운영자는 자신이 관리하는 학교만 수정할 수 있습니다. */
 	@PatchMapping("/schools/{schoolId}")
 	public SchoolResponse updateSchool(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String schoolId, @Valid @RequestBody UpdateSchoolRequest request) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
-		School school = schoolRepository.findById(schoolId).orElseThrow(() -> new IllegalArgumentException("학교를 찾을 수 없습니다."));
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		ensureOperatorManagesSchool(operator.userId(), schoolId);
+		School school = schoolRepository.findById(schoolId).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		school.update(request.name(), request.active());
 		return SchoolResponse.from(schoolRepository.save(school));
 	}
 
+	/** 학교의 학급 목록 — 운영자는 자신이 관리하는 학교의 학급만 조회할 수 있습니다. */
 	@GetMapping("/schools/{schoolId}/classrooms")
 	public List<ClassroomResponse> getClassrooms(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String schoolId) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		ensureOperatorManagesSchool(operator.userId(), schoolId);
 		return classroomRepository.findBySchoolIdOrderByNameAsc(schoolId).stream().map(ClassroomResponse::from).toList();
 	}
 
+	/** 학급 생성 — 운영자는 자신이 관리하는 학교에만 학급을 생성할 수 있습니다. */
 	@PostMapping("/schools/{schoolId}/classrooms")
 	public ClassroomResponse createClassroom(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String schoolId, @Valid @RequestBody CreateClassroomRequest request) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		ensureOperatorManagesSchool(operator.userId(), schoolId);
+		schoolRepository.findById(schoolId).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		return ClassroomResponse.from(classroomRepository.save(new Classroom(schoolId, request.name(), request.grade())));
 	}
 
+	/** 학급 수정 — 운영자는 자신이 관리하는 학교의 학급만 수정할 수 있습니다. */
 	@PatchMapping("/classrooms/{classroomId}")
 	public ClassroomResponse updateClassroom(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String classroomId, @Valid @RequestBody UpdateClassroomRequest request) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
-		Classroom classroom = classroomRepository.findById(classroomId).orElseThrow(() -> new IllegalArgumentException("학급을 찾을 수 없습니다."));
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		Classroom classroom = classroomRepository.findById(classroomId).orElseThrow(() -> new NotFoundException("학급을 찾을 수 없습니다."));
+		ensureOperatorManagesSchool(operator.userId(), classroom.getSchoolId());
 		classroom.update(request.name(), request.grade());
 		return ClassroomResponse.from(classroomRepository.save(classroom));
 	}
 
+	/** 사용자 목록 — 운영자는 자신이 관리하는 학교의 사용자만 조회할 수 있습니다. */
 	@GetMapping("/users")
 	public List<AdminUserResponse> getUsers(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @RequestParam(required = false) String schoolId) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		List<String> managedSchoolIds = getManagedSchoolIds(operator.userId());
+		String effectiveSchoolId = (schoolId != null && !schoolId.isBlank()) ? schoolId : null;
+		if (effectiveSchoolId != null) {
+			ensureOperatorManagesSchool(operator.userId(), effectiveSchoolId);
+		}
 		return authUserRepository.findAll().stream()
-			.filter(user -> schoolId == null || schoolId.isBlank() || schoolId.equals(user.getSchoolId()))
+			.filter(user -> effectiveSchoolId != null
+				? effectiveSchoolId.equals(user.getSchoolId())
+				: managedSchoolIds.contains(user.getSchoolId()))
 			.map(AdminUserResponse::from)
 			.toList();
 	}
 
+	/** 사용자 생성 — 운영자는 자신이 관리하는 학교에만 사용자를 생성할 수 있습니다. */
 	@PostMapping("/users")
 	public AdminUserResponse createUser(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @Valid @RequestBody CreateAdminUserRequest request) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		ensureOperatorManagesSchool(operator.userId(), request.schoolId());
+		ensureClassroomMatchesSchool(request.classroomId(), request.schoolId());
 		AuthUserEntity user = new AuthUserEntity(
 			request.schoolId(),
 			request.classroomId(),
@@ -107,23 +140,61 @@ public class AdminDirectoryController {
 			request.displayName(),
 			request.role()
 		);
-		return AdminUserResponse.from(authUserRepository.save(user));
+		AuthUserEntity savedUser = authUserRepository.save(user);
+		syncOperatorMembership(savedUser.getId(), request.schoolId(), request.role());
+		return AdminUserResponse.from(savedUser);
 	}
 
+	/** 사용자 수정 — 운영자는 자신이 관리하는 학교의 사용자만 수정할 수 있습니다. */
 	@PatchMapping("/users/{userId}")
 	public AdminUserResponse updateUser(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String userId, @Valid @RequestBody UpdateAdminUserRequest request) {
-		authService.requireRole(authorizationHeader, Role.OPERATOR);
-		AuthUserEntity user = authUserRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		AuthUserEntity user = authUserRepository.findById(userId).orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다."));
+		ensureOperatorManagesSchool(operator.userId(), user.getSchoolId());
+		ensureOperatorManagesSchool(operator.userId(), request.schoolId());
+		ensureClassroomMatchesSchool(request.classroomId(), request.schoolId());
 		user.update(request.schoolId(), request.classroomId(), request.displayName(), request.role(), request.active());
 		if (request.password() != null && !request.password().isBlank()) {
 			user.updatePassword(passwordEncoder.encode(request.password()));
 		}
-		return AdminUserResponse.from(authUserRepository.save(user));
+		AuthUserEntity savedUser = authUserRepository.save(user);
+		syncOperatorMembership(savedUser.getId(), request.schoolId(), request.role());
+		return AdminUserResponse.from(savedUser);
 	}
 
+	/** 학교 마스터 데이터 동기화 — 플랫폼 수준 작업으로 모든 운영자가 접근할 수 있습니다. */
 	@PostMapping("/schools/sync-master")
 	public SchoolMasterSyncResponse syncSchoolMaster(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
 		authService.requireRole(authorizationHeader, Role.OPERATOR);
 		return schoolMasterSyncService.syncAll();
+	}
+
+	/** 운영자가 관리하는 학교 ID 목록을 반환합니다. */
+	private List<String> getManagedSchoolIds(String operatorUserId) {
+		return schoolOperatorMembershipRepository.findByUserIdAndActiveTrue(operatorUserId)
+			.stream().map(SchoolOperatorMembershipEntity::getSchoolId).toList();
+	}
+
+	/** 운영자가 해당 학교의 관리 권한이 있는지 검증합니다. */
+	private void ensureOperatorManagesSchool(String operatorUserId, String schoolId) {
+		schoolOperatorMembershipRepository.findBySchoolIdAndUserIdAndActiveTrue(schoolId, operatorUserId)
+			.orElseThrow(() -> new ForbiddenException("해당 학교의 관리 권한이 없습니다."));
+	}
+
+	/** 사용자와 학급의 학교 소속이 일치하는지 검증합니다. */
+	private void ensureClassroomMatchesSchool(String classroomId, String schoolId) {
+		if (classroomId == null || classroomId.isBlank()) {
+			return;
+		}
+		classroomRepository.findByIdAndSchoolId(classroomId, schoolId)
+			.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
+	}
+
+	/** 운영자 역할 변경 시 사용자 schoolId 기준으로 membership을 동기화합니다. */
+	private void syncOperatorMembership(String userId, String schoolId, Role role) {
+		schoolOperatorMembershipRepository.deleteByUserId(userId);
+		if (role == Role.OPERATOR) {
+			schoolOperatorMembershipRepository.save(new SchoolOperatorMembershipEntity(schoolId, userId));
+		}
 	}
 }

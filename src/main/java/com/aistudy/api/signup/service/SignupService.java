@@ -49,6 +49,7 @@ public class SignupService {
 		return schoolMasterRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(keyword == null ? "" : keyword);
 	}
 
+	/** 교사 가입 요청 — 학교 활성 여부를 검증합니다. */
 	@Transactional
 	public SignupRequestEntity requestTeacherSignup(CreateTeacherSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
@@ -68,11 +69,14 @@ public class SignupService {
 		));
 	}
 
+	/** 학생 가입 요청 — 학교 활성 여부 및 학급-학교 소속 일치를 검증합니다. */
 	@Transactional
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
-		schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
+		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
+		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
 		if (request.classroomId() != null && !request.classroomId().isBlank()) {
-			classroomRepository.findById(request.classroomId()).orElseThrow(() -> new NotFoundException("학급을 찾을 수 없습니다."));
+			classroomRepository.findByIdAndSchoolId(request.classroomId(), request.schoolId())
+				.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
 		}
 		return signupRequestRepository.save(new SignupRequestEntity(
 			request.schoolId(),
@@ -113,10 +117,10 @@ public class SignupService {
 			);
 			authUserRepository.save(user);
 			request.approve(reviewer.userId(), provisionedLoginId, provisionedTempPassword);
-			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(reviewer.schoolId(), request.getId(), reviewer.userId(), "APPROVED", null));
+			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(request.getSchoolId(), request.getId(), reviewer.userId(), "APPROVED", null));
 		} else {
 			request.reject(reviewer.userId(), rejectionReason);
-			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(reviewer.schoolId(), request.getId(), reviewer.userId(), "REJECTED", rejectionReason));
+			approvalAuditLogRepository.save(new ApprovalAuditLogEntity(request.getSchoolId(), request.getId(), reviewer.userId(), "REJECTED", rejectionReason));
 		}
 		return signupRequestRepository.save(request);
 	}
