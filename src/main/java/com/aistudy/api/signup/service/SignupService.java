@@ -75,7 +75,7 @@ public class SignupService {
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
-		if (authUserRepository.findBySchoolIdAndDisplayNameAndRole(request.schoolId(), request.realName(), Role.STUDENT).isPresent()) {
+		if (authUserRepository.existsBySchoolIdAndDisplayNameAndRole(request.schoolId(), request.realName(), Role.STUDENT)) {
 			throw new BadRequestException("같은 학교에 동일한 이름의 학생 계정이 이미 존재합니다.");
 		}
 		if (request.classroomId() != null && !request.classroomId().isBlank()) {
@@ -110,7 +110,7 @@ public class SignupService {
 		if (request.getStatus() != SignupStatus.PENDING) throw new BadRequestException("이미 처리된 가입 요청입니다.");
 		if (approve) {
 			if (request.getRole() == SignupRole.STUDENT) {
-				if (authUserRepository.findBySchoolIdAndDisplayNameAndRole(request.getSchoolId(), request.getRequesterName(), Role.STUDENT).isPresent()) {
+				if (authUserRepository.existsBySchoolIdAndDisplayNameAndRole(request.getSchoolId(), request.getRequesterName(), Role.STUDENT)) {
 					throw new BadRequestException("같은 학교에 동일한 이름의 학생 계정이 이미 존재합니다.");
 				}
 				// 학생 승인: PIN 기반 인증, 임시 비밀번호 생성 없음
