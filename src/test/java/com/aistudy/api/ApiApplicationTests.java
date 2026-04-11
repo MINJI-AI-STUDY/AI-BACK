@@ -48,13 +48,13 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"teacher","password":"teacher123"}
+					{"loginId":"mock-teacher","password":"teacher123"}
 					""")
 		)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.accessToken").isNotEmpty())
 			.andExpect(jsonPath("$.role").value("TEACHER"))
-			.andExpect(jsonPath("$.displayName").value("교사 데모"));
+			.andExpect(jsonPath("$.displayName").value("교사 목업"));
 	}
 
 	/**
@@ -66,7 +66,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"teacher","password":"wrong"}
+					{"loginId":"mock-teacher","password":"wrong"}
 					""")
 		)
 			.andExpect(status().isUnauthorized())
@@ -84,7 +84,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"teacher","password":"teacher123"}
+					{"loginId":"mock-teacher","password":"teacher123"}
 					""")
 		)
 			.andReturn()
@@ -117,7 +117,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"teacher","password":"teacher123"}
+					{"loginId":"mock-teacher","password":"teacher123"}
 					""")
 		)
 			.andReturn()
@@ -149,7 +149,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"teacher","password":"teacher123"}
+					{"loginId":"mock-teacher","password":"teacher123"}
 					""")
 		)
 			.andReturn()
@@ -603,7 +603,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"teacher","password":"teacher123"}
+					{"loginId":"mock-teacher","password":"teacher123"}
 					""")
 		)
 			.andReturn()
@@ -617,7 +617,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"student","password":"student123"}
+					{"loginId":"mock-student","password":"student123"}
 					""")
 		)
 			.andReturn()
@@ -631,7 +631,7 @@ class ApiApplicationTests {
 			post("/api/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"loginId":"operator","password":"operator123"}
+					{"loginId":"mock-operator","password":"operator123"}
 					""")
 		)
 			.andReturn()
