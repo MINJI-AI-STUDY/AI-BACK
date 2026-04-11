@@ -7,6 +7,7 @@ public record AuthUser(
 	String loginId,
 	String password,
 	String displayName,
-	Role role
+	Role role,
+	String studentCode
 ) {
 }

@@ -25,13 +25,17 @@ public class JwtTokenProvider {
 
 	public String createToken(AuthUser user) {
 		Instant now = Instant.now();
-		return Jwts.builder()
+		var builder = Jwts.builder()
 			.subject(user.loginId())
 			.claim("userId", user.userId())
 			.claim("role", user.role().name())
 			.claim("schoolId", user.schoolId())
-			.claim("classroomId", user.classroomId())
-			.claim("displayName", user.displayName())
+			.claim("classroomId", user.classroomId() == null ? "" : user.classroomId())
+			.claim("displayName", user.displayName());
+		if (user.studentCode() != null) {
+			builder.claim("studentCode", user.studentCode());
+		}
+		return builder
 			.issuedAt(Date.from(now))
 			.expiration(Date.from(now.plusMillis(expirationMs)))
 			.signWith(secretKey)
