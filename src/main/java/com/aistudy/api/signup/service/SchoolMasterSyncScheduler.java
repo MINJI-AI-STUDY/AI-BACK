@@ -1,5 +1,6 @@
 package com.aistudy.api.signup.service;
 
+import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,7 +27,7 @@ public class SchoolMasterSyncScheduler {
 	/** 서버 시작 직후 학교 마스터 동기화를 1회 수행합니다. */
 	@EventListener(ApplicationReadyEvent.class)
 	public void syncOnStartup() {
-		runSync("startup");
+		CompletableFuture.runAsync(() -> runSync("startup"));
 	}
 
 	/** 매월 1일 새벽에 학교 마스터를 재동기화합니다. */
