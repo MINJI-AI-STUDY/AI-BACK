@@ -3,6 +3,7 @@ package com.aistudy.api.auth;
 import com.aistudy.api.common.ForbiddenException;
 import io.jsonwebtoken.JwtException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,12 +16,14 @@ public class AuthService {
 	private final RefreshTokenRepository refreshTokenRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider jwtTokenProvider;
+	private final PrivacyService privacyService;
 
-	public AuthService(AuthUserRepository authUserRepository, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
+	public AuthService(AuthUserRepository authUserRepository, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, PrivacyService privacyService) {
 		this.authUserRepository = authUserRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenProvider = jwtTokenProvider;
+		this.privacyService = privacyService;
 	}
 
 	/** 로그인 요청을 검증하고 토큰을 발급합니다. */
@@ -64,7 +67,10 @@ public class AuthService {
 	/** Authorization 헤더에서 현재 사용자를 복원합니다. */
 	public MeResponse me(String authorizationHeader) {
 		AuthUser user = getCurrentUser(authorizationHeader);
-		return new MeResponse(user.userId(), user.schoolId(), user.classroomId(), user.role(), user.displayName());
+		AuthUserEntity entity = authUserRepository.findByLoginId(user.loginId())
+			.orElseThrow(() -> new AuthException("유효하지 않은 토큰입니다."));
+		List<PrivacyConsentResponse> consents = privacyService.getConsents(user.userId());
+		return new MeResponse(user.userId(), user.schoolId(), user.classroomId(), user.role(), user.displayName(), entity.isActive(), entity.getCreatedAt(), consents);
 	}
 
 	/** 현재 사용자를 반환합니다. */
