@@ -8,6 +8,8 @@
 - `APP_SCHOOL_API_KEY`
 - `APP_SCHOOL_API_ENDPOINT`
 - `APP_SCHOOL_API_PAGE_SIZE`
+- `APP_SCHOOL_API_SYNC_ENABLED`
+- `APP_SCHOOL_API_SYNC_CRON`
 
 ## 권장 기본값
 - `APP_SCHOOL_API_PAGE_SIZE=100`
@@ -16,6 +18,11 @@
 ## 동기화 엔드포인트
 - `POST /api/operator/schools/sync-master`
 
+## 자동 동기화
+- 백엔드 시작 직후 학교 마스터 동기화를 1회 수행합니다.
+- 이후 `APP_SCHOOL_API_SYNC_CRON` 기준으로 매월 1회 자동 동기화를 수행합니다.
+- `APP_SCHOOL_API_SYNC_ENABLED=false`이면 자동 동기화를 비활성화할 수 있습니다.
+
 ## 기대 동작
 - Open API에서 페이지 단위로 학교 데이터를 읽어옵니다.
 - `official_school_code` 기준으로 upsert 합니다.
@@ -23,4 +30,5 @@
 
 ## 현재 한계
 - 실제 전국 적재는 운영 환경의 유효한 Open API 키가 필요합니다.
-- 현재 로컬/테스트는 sync 경로만 구현되어 있으며, sample seed는 여전히 포함됩니다.
+- 테스트 프로필은 외부 API 호출을 피하기 위해 자동 동기화를 비활성화합니다.
+- 로컬/운영에서는 mock 계정 seed와 학교 마스터 자동 동기화가 함께 동작합니다.
