@@ -37,6 +37,7 @@ public class QuestionSetService {
 		this.frontendBaseUrl = frontendBaseUrl;
 	}
 
+	/** 문제 세트 생성 — 교사 소유 자료와 학교 소속을 검증한 뒤 문항 초안을 저장합니다. */
 	@Transactional
 	public QuestionSet generate(String teacherId, String schoolId, String materialId, GenerateQuestionSetRequest request) {
 		Material material = materialService.getOwnedMaterial(teacherId, materialId);
@@ -54,6 +55,7 @@ public class QuestionSetService {
 		return questionSetRepository.save(questionSet);
 	}
 
+	/** 문항 수정 — 교사 본인이 생성한 학교 범위의 문제 세트만 수정할 수 있습니다. */
 	@Transactional
 	public QuestionSet updateQuestion(String teacherId, String schoolId, String questionSetId, String questionId, UpdateQuestionRequest request) {
 		QuestionSet questionSet = getTeacherEditableQuestionSet(teacherId, schoolId, questionSetId);
@@ -65,6 +67,7 @@ public class QuestionSetService {
 		return questionSetRepository.save(questionSet);
 	}
 
+	/** 문제 세트 배포 — 제외되지 않은 문항이 하나 이상 있을 때만 배포 코드를 발급합니다. */
 	@Transactional
 	public QuestionSet publish(String teacherId, String schoolId, String questionSetId, LocalDateTime dueAt) {
 		QuestionSet questionSet = getTeacherEditableQuestionSet(teacherId, schoolId, questionSetId);
@@ -106,6 +109,12 @@ public class QuestionSetService {
 	public QuestionSet getPublishedByCode(String distributionCode) {
 		return questionSetRepository.findByDistributionCodeAndStatus(distributionCode, QuestionSetStatus.PUBLISHED)
 			.orElseThrow(() -> new NotFoundException("문제 세트를 찾을 수 없습니다."));
+	}
+
+	/** 학교 범위 내 문제 세트 목록을 반환합니다. */
+	@Transactional(readOnly = true)
+	public List<QuestionSet> getBySchoolId(String schoolId) {
+		return questionSetRepository.findBySchoolId(schoolId);
 	}
 
 	@Transactional(readOnly = true)
