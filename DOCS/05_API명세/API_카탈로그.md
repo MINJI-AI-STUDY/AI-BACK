@@ -3,6 +3,7 @@
 | 도메인 | 메서드 | URL | 설명 |
 | --- | --- | --- | --- |
 | auth | POST | `/api/auth/login` | 로그인 |
+| auth | POST | `/api/auth/student/login` | 학생 PIN 로그인 |
 | auth | GET | `/api/auth/me` | 현재 사용자 조회 |
 | auth | POST | `/api/auth/refresh` | access token 재발급 |
 | auth | POST | `/api/auth/logout` | refresh token revoke |
@@ -10,7 +11,7 @@
 | material | GET | `/api/teacher/materials` | 교사 자료 목록 조회 |
 | material | GET | `/api/teacher/materials/{materialId}` | 자료 상태 조회 |
 | material | POST | `/api/teacher/materials/{materialId}/retry` | 자료 재처리 |
-| material | GET | `/api/teacher/materials/document/{materialId}` | 자료 PDF inline 조회 |
+| material | GET | `/api/materials/document/{materialId}` | 공통 자료 PDF inline 조회 |
 | material | GET | `/api/student/materials` | 학생 자료 목록 조회 |
 | question | POST | `/api/teacher/materials/{materialId}/question-sets/generate` | 문제 생성 |
 | question | GET | `/api/teacher/materials/{materialId}/question-sets` | 자료별 문제 세트 목록 |

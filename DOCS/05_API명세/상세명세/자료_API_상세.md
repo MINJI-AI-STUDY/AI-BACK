@@ -55,5 +55,6 @@
 - `FAILED` 상태 자료만 가능
 
 ## 6. 자료 문서 조회
-- `GET /api/teacher/materials/document/{materialId}`
+- `GET /api/materials/document/{materialId}`
 - 학생/교사/운영자 모두 권한 범위 내에서 PDF inline 응답을 받을 수 있습니다.
+- 기존 teacher 전용 경로는 호환성 유지 목적이 아니라면 점진 제거 대상으로 관리합니다.
