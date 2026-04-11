@@ -38,6 +38,18 @@ public class AuthService {
 		return LoginResponse.from(issueTokens(user));
 	}
 
+	/** 학생 PIN 로그인 — 학교 범위 내 학생 실명과 PIN으로 인증합니다. */
+	@Transactional
+	public StudentLoginResponse studentLogin(StudentLoginRequest request) {
+		AuthUserEntity entity = authUserRepository.findBySchoolIdAndDisplayNameAndRole(request.schoolId(), request.studentName(), Role.STUDENT)
+			.filter(AuthUserEntity::isActive)
+			.filter(candidate -> candidate.getPin() != null && passwordEncoder.matches(request.pin(), candidate.getPin()))
+			.orElseThrow(() -> new AuthException("학교, 이름 또는 PIN이 올바르지 않습니다."));
+
+		AuthUser user = entity.toAuthUser();
+		return StudentLoginResponse.from(issueTokens(user), user.schoolId(), user.classroomId());
+	}
+
 	@Transactional
 	public TokenResponse refresh(RefreshTokenRequest request) {
 		RefreshTokenEntity refreshToken = refreshTokenRepository.findByToken(request.refreshToken())
