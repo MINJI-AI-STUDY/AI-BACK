@@ -39,6 +39,10 @@ public class AuthUserEntity {
 	@Column(name = "pin")
 	private String pin;
 
+	/** 학교 범위 내 학생 고유 코드 (교사/운영자는 null) */
+	@Column(name = "student_code")
+	private String studentCode;
+
 	@Column(nullable = false)
 	private boolean active;
 
@@ -49,11 +53,11 @@ public class AuthUserEntity {
 	}
 
 	public AuthUserEntity(String schoolId, String classroomId, String loginId, String password, String displayName, Role role) {
-		this(schoolId, classroomId, loginId, password, displayName, role, null);
+		this(schoolId, classroomId, loginId, password, displayName, role, null, null);
 	}
 
-	/** 학생 PIN 포함 생성자 — 교사/운영자는 pin=null로 위 생성자 사용 */
-	public AuthUserEntity(String schoolId, String classroomId, String loginId, String password, String displayName, Role role, String pin) {
+	/** 학생 PIN + studentCode 포함 생성자 — 교사/운영자는 pin=null, studentCode=null로 위 생성자 사용 */
+	public AuthUserEntity(String schoolId, String classroomId, String loginId, String password, String displayName, Role role, String pin, String studentCode) {
 		this.id = UUID.randomUUID().toString();
 		this.schoolId = schoolId;
 		this.classroomId = classroomId;
@@ -62,6 +66,7 @@ public class AuthUserEntity {
 		this.displayName = displayName;
 		this.role = role;
 		this.pin = pin;
+		this.studentCode = studentCode;
 		this.active = true;
 	}
 
@@ -81,10 +86,11 @@ public class AuthUserEntity {
 	public Role getRole() { return role; }
 	public boolean isActive() { return active; }
 	public String getPin() { return pin; }
+	public String getStudentCode() { return studentCode; }
 	public LocalDateTime getCreatedAt() { return createdAt; }
 
 	public AuthUser toAuthUser() {
-		return new AuthUser(id, schoolId, classroomId, loginId, password, displayName, role);
+		return new AuthUser(id, schoolId, classroomId, loginId, password, displayName, role, studentCode);
 	}
 
 	public void update(String schoolId, String classroomId, String displayName, Role role, boolean active) {

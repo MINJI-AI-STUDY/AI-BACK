@@ -9,6 +9,7 @@ public record MeResponse(
 	String classroomId,
 	Role role,
 	String displayName,
+	String studentCode,
 	boolean active,
 	LocalDateTime createdAt,
 	List<PrivacyConsentResponse> privacyConsents
