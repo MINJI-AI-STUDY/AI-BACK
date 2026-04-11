@@ -38,6 +38,7 @@ public class DashboardService {
 		this.qaService = qaService;
 	}
 
+	/** 교사 문제 세트 대시보드 집계 — 교사 소속 학교 범위의 제출/정답률/취약 개념을 계산합니다. */
 	public TeacherDashboardResponse getTeacherDashboard(String schoolId, String questionSetId) {
 		QuestionSet questionSet = questionSetService.getSchoolScopedQuestionSet(schoolId, questionSetId);
 		List<Submission> submissions = submissionService.getByQuestionSetId(questionSetId);
@@ -67,6 +68,7 @@ public class DashboardService {
 		return new TeacherDashboardResponse(studentScores, questionAccuracy, weakConceptTags);
 	}
 
+	/** 자료 대시보드 집계 — 학교 범위의 문제 세트, 제출, QA 로그를 문서 기준으로 요약합니다. */
 	public DocumentDashboardResponse getDocumentDashboard(String schoolId, String materialId) {
 		Material material = materialService.getSchoolMaterial(schoolId, materialId);
 		List<QuestionSet> questionSets = questionSetService.getByMaterial(schoolId, materialId);
@@ -96,9 +98,10 @@ public class DashboardService {
 		);
 	}
 
-	public OperatorOverviewResponse getOperatorOverview() {
-		List<Submission> submissions = submissionService.getAll();
-		List<QuestionSet> questionSets = questionSetService.getAll();
+	/** 운영자 개요 — 학교 범위 내 데이터만 집계합니다. */
+	public OperatorOverviewResponse getOperatorOverview(String schoolId) {
+		List<Submission> submissions = submissionService.getBySchoolId(schoolId);
+		List<QuestionSet> questionSets = questionSetService.getBySchoolId(schoolId);
 		double averageScore = submissions.stream().mapToInt(Submission::getScore).average().orElse(0);
 		long participatedSetCount = submissions.stream().map(Submission::getQuestionSetId).distinct().count();
 		long completedSetCount = submissions.stream().filter(submission -> submission.getScore() >= 0).map(Submission::getQuestionSetId).distinct().count();

@@ -10,4 +10,5 @@ public interface QuestionSetRepository extends JpaRepository<QuestionSet, String
 	Optional<QuestionSet> findByDistributionCodeAndStatus(String distributionCode, QuestionSetStatus status);
 	List<QuestionSet> findByMaterialIdAndSchoolIdOrderByCreatedAtDesc(String materialId, String schoolId);
 	long countByMaterialIdAndSchoolId(String materialId, String schoolId);
+	List<QuestionSet> findBySchoolId(String schoolId);
 }
