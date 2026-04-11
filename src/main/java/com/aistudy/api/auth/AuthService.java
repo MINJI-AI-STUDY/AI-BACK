@@ -39,23 +39,16 @@ public class AuthService {
 		return LoginResponse.from(issueTokens(user));
 	}
 
-	/** 학생 PIN 로그인 — 학교 범위 내 학생 실명과 PIN으로 인증합니다. */
+	/** 학생 PIN 로그인 — 학교 범위 내 학생 코드와 PIN으로 인증합니다. */
 	@Transactional
 	public StudentLoginResponse studentLogin(StudentLoginRequest request) {
-		List<AuthUserEntity> candidates = authUserRepository.findAllBySchoolIdAndDisplayNameAndRole(request.schoolId(), request.studentName(), Role.STUDENT)
-			.stream()
+		AuthUserEntity entity = authUserRepository.findBySchoolIdAndStudentCodeAndRole(request.schoolId(), request.studentCode(), Role.STUDENT)
 			.filter(AuthUserEntity::isActive)
-			.toList();
-		if (candidates.size() > 1) {
-			throw new BadRequestException("같은 학교에 동일한 이름의 학생 계정이 여러 개 존재합니다. 학교 운영자에게 문의하세요.");
-		}
-		AuthUserEntity entity = candidates.stream()
 			.filter(candidate -> candidate.getPin() != null && passwordEncoder.matches(request.pin(), candidate.getPin()))
-			.findFirst()
-			.orElseThrow(() -> new AuthException("학교, 이름 또는 PIN이 올바르지 않습니다."));
+			.orElseThrow(() -> new AuthException("학교, 학생 코드 또는 PIN이 올바르지 않습니다."));
 
 		AuthUser user = entity.toAuthUser();
-		return StudentLoginResponse.from(issueTokens(user), user.schoolId(), user.classroomId());
+		return StudentLoginResponse.from(issueTokens(user), user.schoolId(), user.classroomId(), user.studentCode());
 	}
 
 	@Transactional
@@ -90,7 +83,7 @@ public class AuthService {
 		AuthUserEntity entity = authUserRepository.findByLoginId(user.loginId())
 			.orElseThrow(() -> new AuthException("유효하지 않은 토큰입니다."));
 		List<PrivacyConsentResponse> consents = privacyService.getConsents(user.userId());
-		return new MeResponse(user.userId(), user.schoolId(), user.classroomId(), user.role(), user.displayName(), entity.isActive(), entity.getCreatedAt(), consents);
+		return new MeResponse(user.userId(), user.schoolId(), user.classroomId(), user.role(), user.displayName(), user.studentCode(), entity.isActive(), entity.getCreatedAt(), consents);
 	}
 
 	/** 현재 사용자를 반환합니다. */
