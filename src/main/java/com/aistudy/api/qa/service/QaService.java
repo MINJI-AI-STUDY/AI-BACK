@@ -24,6 +24,7 @@ public class QaService {
 		this.aiIntegrationService = aiIntegrationService;
 	}
 
+	/** 학생 질문 — schoolId로 자료 소속 검증 후 QA 로그 저장 */
 	@Transactional
 	public QaResponse ask(String studentId, String schoolId, String materialId, String question) {
 		Material material = materialService.getSchoolMaterial(schoolId, materialId);
@@ -44,12 +45,14 @@ public class QaService {
 		return response;
 	}
 
+	/** 학생 QA 로그 — schoolId로 자료 소속 검증 후 반환 */
 	@Transactional(readOnly = true)
 	public List<QALog> getStudentLogs(String schoolId, String materialId, String studentId) {
 		materialService.getSchoolMaterial(schoolId, materialId);
 		return qaLogRepository.findByMaterialIdAndStudentIdOrderByCreatedAtDesc(materialId, studentId);
 	}
 
+	/** 교사 QA 로그 — schoolId로 자료 소속 검증 후 반환 */
 	@Transactional(readOnly = true)
 	public List<QALog> getTeacherLogs(String schoolId, String materialId) {
 		materialService.getSchoolMaterial(schoolId, materialId);

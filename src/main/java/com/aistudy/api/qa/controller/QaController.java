@@ -28,18 +28,21 @@ public class QaController {
 		this.qaService = qaService;
 	}
 
+	/** 학생 질문 — 학생 소속 학교의 자료에만 접근 가능합니다. */
 	@PostMapping("/student/materials/{materialId}/qa")
 	public QaResponse ask(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String materialId, @Valid @RequestBody QaRequest request) {
 		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
 		return qaService.ask(student.userId(), student.schoolId(), materialId, request.question());
 	}
 
+	/** 학생 QA 로그 — 학생 소속 학교 범위 내 로그만 조회됩니다. */
 	@GetMapping("/student/materials/{materialId}/qa-logs/me")
 	public List<QALogResponse> studentLogs(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String materialId) {
 		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
 		return qaService.getStudentLogs(student.schoolId(), materialId, student.userId()).stream().map(QALogResponse::from).toList();
 	}
 
+	/** 교사 QA 로그 — 교사 소속 학교 범위 내 로그만 조회됩니다. */
 	@GetMapping("/teacher/materials/{materialId}/qa-logs")
 	public List<QALogResponse> teacherLogs(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String materialId) {
 		AuthUser teacher = authService.requireRole(authorizationHeader, Role.TEACHER);
