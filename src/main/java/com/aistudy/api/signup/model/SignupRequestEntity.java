@@ -41,6 +41,10 @@ public class SignupRequestEntity {
 	@Column(name = "student_real_name")
 	private String studentRealName;
 
+	/** 학생 코드 — 승인 시 운영자가 지정/확인하는 학교 범위 내 고유 식별자 */
+	@Column(name = "student_code")
+	private String studentCode;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	private SignupStatus status;
@@ -74,7 +78,7 @@ public class SignupRequestEntity {
 
 	protected SignupRequestEntity() {}
 
-	public SignupRequestEntity(String schoolId, String classroomId, String requesterName, String loginId, String passwordHash, SignupRole role, String schoolEmail, String studentRealName, boolean consentTerms, boolean consentPrivacy, boolean consentStudentNotice) {
+	public SignupRequestEntity(String schoolId, String classroomId, String requesterName, String loginId, String passwordHash, SignupRole role, String schoolEmail, String studentRealName, String studentCode, boolean consentTerms, boolean consentPrivacy, boolean consentStudentNotice) {
 		this.id = UUID.randomUUID().toString();
 		this.schoolId = schoolId;
 		this.classroomId = classroomId;
@@ -84,6 +88,7 @@ public class SignupRequestEntity {
 		this.role = role;
 		this.schoolEmail = schoolEmail;
 		this.studentRealName = studentRealName;
+		this.studentCode = studentCode;
 		this.status = SignupStatus.PENDING;
 		this.consentTerms = consentTerms;
 		this.consentPrivacy = consentPrivacy;
@@ -102,6 +107,7 @@ public class SignupRequestEntity {
 	public SignupRole getRole() { return role; }
 	public String getSchoolEmail() { return schoolEmail; }
 	public String getStudentRealName() { return studentRealName; }
+	public String getStudentCode() { return studentCode; }
 	public SignupStatus getStatus() { return status; }
 	public boolean isConsentTerms() { return consentTerms; }
 	public boolean isConsentPrivacy() { return consentPrivacy; }
@@ -129,5 +135,10 @@ public class SignupRequestEntity {
 		this.reviewedBy = reviewerUserId;
 		this.reviewedAt = LocalDateTime.now();
 		this.rejectionReason = rejectionReason;
+	}
+
+	/** 승인 시 운영자가 지정한 studentCode를 반영합니다. */
+	public void setStudentCode(String studentCode) {
+		this.studentCode = studentCode;
 	}
 }
