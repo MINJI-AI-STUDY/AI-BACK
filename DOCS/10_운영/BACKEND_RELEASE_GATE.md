@@ -15,6 +15,7 @@
 ## 3. 필수 명령
 - 테스트: `./gradlew test`
 - 빌드: `./gradlew build`
+- 패키징 확인: `./gradlew assemble`
 - 로컬 구동 확인: `./gradlew bootRun --args="--spring.profiles.active=local"`
 
 명령명이 문서와 실제 빌드 스크립트 간에 달라지면 본 문서를 먼저 갱신한다.
