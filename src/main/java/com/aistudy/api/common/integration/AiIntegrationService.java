@@ -5,18 +5,20 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
-
 @Service
 public class AiIntegrationService {
+	private static final Logger log = LoggerFactory.getLogger(AiIntegrationService.class);
 	private static final Pattern CONTROL_CHAR_PATTERN = Pattern.compile("[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]");
 
 	private final RestClient restClient;
-
 	public AiIntegrationService(@Value("${app.ai.base-url}") String aiBaseUrl) {
 		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
 		requestFactory.setConnectTimeout(10000);
@@ -40,7 +42,11 @@ public class AiIntegrationService {
 				.retrieve()
 				.body(Map.class);
 			return String.valueOf(response == null ? "" : response.getOrDefault("extractedText", ""));
-		} catch (Exception exception) {
+		} catch (RestClientException e) {
+			log.error("AI 자료 추출 서버 연결 실패: {}", e.getMessage(), e);
+			return "AI 추출 실패로 기본 추출 텍스트를 사용합니다.";
+		} catch (Exception e) {
+			log.error("AI 자료 추출 중 예외 발생: {}", e.getMessage(), e);
 			return "AI 추출 실패로 기본 추출 텍스트를 사용합니다.";
 		}
 	}
@@ -62,7 +68,11 @@ public class AiIntegrationService {
 				.filter(Map.class::isInstance)
 				.map(item -> (Map<String, Object>) item)
 				.toList();
-		} catch (Exception exception) {
+		} catch (RestClientException e) {
+			log.error("AI 문항 생성 서버 연결 실패: {}", e.getMessage(), e);
+			return List.of();
+		} catch (Exception e) {
+			log.error("AI 문항 생성 중 예외 발생: {}", e.getMessage(), e);
 			return List.of();
 		}
 	}
@@ -79,6 +89,7 @@ public class AiIntegrationService {
 				.retrieve()
 				.body(Map.class);
 			if (response == null) {
+				log.warn("AI QA 응답이 비어 있습니다. context길이={}, question={}", normalizedContext.length(), question);
 				return new QaResponse("AI 응답이 비어 있습니다.", List.of(), false, true);
 			}
 			return new QaResponse(
@@ -87,8 +98,12 @@ public class AiIntegrationService {
 				Boolean.TRUE.equals(response.get("grounded")),
 				Boolean.TRUE.equals(response.get("insufficientEvidence"))
 			);
-		} catch (Exception exception) {
-			return new QaResponse("AI 서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.", List.of(), false, true);
+		} catch (RestClientException e) {
+			log.error("AI QA 서버 연결 실패: {}", e.getMessage(), e);
+			return new QaResponse("AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.", List.of(), false, false);
+		} catch (Exception e) {
+			log.error("AI QA 처리 중 예외 발생: {}", e.getMessage(), e);
+			return new QaResponse("AI 응답 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", List.of(), false, false);
 		}
 	}
 

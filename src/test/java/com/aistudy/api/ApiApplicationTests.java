@@ -3,6 +3,7 @@ package com.aistudy.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 
 import org.junit.jupiter.api.Test;
@@ -519,6 +520,52 @@ class ApiApplicationTests {
 			.andExpect(jsonPath("$.grounded").value(false))
 			.andExpect(jsonPath("$.insufficientEvidence").value(true))
 			.andExpect(jsonPath("$.answer").value("AI 실패"));
+	}
+
+	/**
+	 * F6 AI connectivity failure returns insufficientEvidence=false (service error, not evidence shortage).
+	 */
+	@Test
+	void aiConnectivityFailureReturnsServiceErrorResponse() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("extracted text");
+		when(aiIntegrationService.ask(anyString(), anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("AI server unreachable", List.of(), false, false));
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "connectivity-test", "desc");
+		String studentToken = studentAccessToken();
+
+		mockMvc.perform(
+			post("/api/student/materials/" + materialId + "/qa")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"question\":\"test question\"}")
+		)
+		.andExpect(status().isOk())
+		.andExpect(jsonPath("$.grounded").value(false))
+		.andExpect(jsonPath("$.insufficientEvidence").value(false));
+	}
+
+	/**
+	 * F6 AI processing error returns insufficientEvidence=false (service error, not evidence shortage).
+	 */
+	@Test
+	void aiProcessingErrorReturnsServiceErrorResponse() throws Exception {
+		when(aiIntegrationService.extractMaterial(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn("extracted text");
+		when(aiIntegrationService.ask(anyString(), anyString())).thenReturn(new com.aistudy.api.qa.dto.QaResponse("AI processing error", List.of(), false, false));
+
+		String teacherToken = teacherAccessToken();
+		String materialId = uploadReadyMaterial(teacherToken, "processing-error-test", "desc");
+		String studentToken = studentAccessToken();
+
+		mockMvc.perform(
+			post("/api/student/materials/" + materialId + "/qa")
+				.header("Authorization", "Bearer " + studentToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"question\":\"test question\"}")
+		)
+		.andExpect(status().isOk())
+		.andExpect(jsonPath("$.grounded").value(false))
+		.andExpect(jsonPath("$.insufficientEvidence").value(false));
 	}
 
 	@Test
