@@ -42,6 +42,12 @@ public class StudentSubmissionController {
 		return submissionService.getActiveQuestionSet(student.schoolId(), materialId);
 	}
 
+	@GetMapping("/channels/{channelId}/active-question-set")
+	public StudentActiveQuestionSetResponse getActiveQuestionSetByChannel(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String channelId) {
+		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
+		return submissionService.getActiveQuestionSetByChannel(student.schoolId(), channelId);
+	}
+
 	@PostMapping("/question-sets/{distributionCode}/submissions")
 	public SubmissionResponse submit(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String distributionCode, @Valid @RequestBody SubmitQuestionSetRequest request) {
 		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);

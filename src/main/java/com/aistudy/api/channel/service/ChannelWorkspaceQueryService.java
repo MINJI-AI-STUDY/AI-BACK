@@ -2,11 +2,16 @@ package com.aistudy.api.channel.service;
 
 import com.aistudy.api.auth.AuthUser;
 import com.aistudy.api.channel.dto.ChannelParticipantResponse;
+import com.aistudy.api.channel.dto.ChannelQuestionSetSummaryResponse;
 import com.aistudy.api.channel.dto.ChannelResponse;
 import com.aistudy.api.channel.dto.ChannelWorkspaceResponse;
 import com.aistudy.api.material.dto.MaterialSummaryResponse;
 import com.aistudy.api.material.repository.MaterialRepository;
+import com.aistudy.api.question.model.QuestionSet;
+import com.aistudy.api.question.service.QuestionSetService;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,17 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChannelWorkspaceQueryService {
 	private final ChannelService channelService;
 	private final MaterialRepository materialRepository;
+	private final QuestionSetService questionSetService;
 	private final ChannelMessageService channelMessageService;
 	private final ChannelPresenceService channelPresenceService;
 
 	public ChannelWorkspaceQueryService(
 		ChannelService channelService,
 		MaterialRepository materialRepository,
+		QuestionSetService questionSetService,
 		ChannelMessageService channelMessageService,
 		ChannelPresenceService channelPresenceService
 	) {
 		this.channelService = channelService;
 		this.materialRepository = materialRepository;
+		this.questionSetService = questionSetService;
 		this.channelMessageService = channelMessageService;
 		this.channelPresenceService = channelPresenceService;
 	}
@@ -34,8 +42,18 @@ public class ChannelWorkspaceQueryService {
 	public ChannelWorkspaceResponse getWorkspace(AuthUser user, String channelId) {
 		var channel = channelService.get(user.schoolId(), channelId);
 		List<MaterialSummaryResponse> materials = materialRepository.findByChannelIdOrderByCreatedAtDesc(channel.getId()).stream().map(MaterialSummaryResponse::from).toList();
+		List<ChannelQuestionSetSummaryResponse> questionSets = getQuestionSets(user.schoolId(), channel.getId(), materials);
 		var recentMessages = channelMessageService.recent(channel.getId());
 		List<ChannelParticipantResponse> participants = channelPresenceService.current(channel.getId());
-		return new ChannelWorkspaceResponse(ChannelResponse.from(channel), materials, recentMessages, participants);
+		return new ChannelWorkspaceResponse(ChannelResponse.from(channel), materials, questionSets, recentMessages, participants);
+	}
+
+	private List<ChannelQuestionSetSummaryResponse> getQuestionSets(String schoolId, String channelId, List<MaterialSummaryResponse> materials) {
+		Map<String, QuestionSet> merged = new LinkedHashMap<>();
+		questionSetService.getByChannel(schoolId, channelId).forEach(questionSet -> merged.put(questionSet.getId(), questionSet));
+		for (MaterialSummaryResponse material : materials) {
+			questionSetService.getByMaterial(schoolId, material.materialId()).forEach(questionSet -> merged.putIfAbsent(questionSet.getId(), questionSet));
+		}
+		return merged.values().stream().map(ChannelQuestionSetSummaryResponse::from).toList();
 	}
 }

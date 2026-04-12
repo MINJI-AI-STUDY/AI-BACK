@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public record StudentActiveQuestionSetResponse(
 	String questionSetId,
+	String channelId,
 	String materialId,
 	String distributionCode,
 	String title,
@@ -13,6 +14,7 @@ public record StudentActiveQuestionSetResponse(
 	public static StudentActiveQuestionSetResponse from(QuestionSet questionSet, String title) {
 		return new StudentActiveQuestionSetResponse(
 			questionSet.getId(),
+			questionSet.getChannelId(),
 			questionSet.getMaterialId(),
 			questionSet.getDistributionCode(),
 			title,

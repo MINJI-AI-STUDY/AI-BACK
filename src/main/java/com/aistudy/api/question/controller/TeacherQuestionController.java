@@ -36,10 +36,22 @@ public class TeacherQuestionController {
 		return QuestionSetResponse.from(questionSetService.generate(teacher.userId(), teacher.schoolId(), materialId, request));
 	}
 
+	@PostMapping("/channels/{channelId}/question-sets/generate")
+	public QuestionSetResponse generateInChannel(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String channelId, @Valid @RequestBody GenerateQuestionSetRequest request) {
+		AuthUser teacher = authService.requireRole(authorizationHeader, Role.TEACHER);
+		return QuestionSetResponse.from(questionSetService.generateInChannel(teacher.userId(), teacher.schoolId(), channelId, request));
+	}
+
 	@GetMapping("/materials/{materialId}/question-sets")
 	public List<QuestionSetResponse> listByMaterial(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String materialId) {
 		AuthUser teacher = authService.requireRole(authorizationHeader, Role.TEACHER);
 		return questionSetService.getByMaterial(teacher.schoolId(), materialId).stream().map(QuestionSetResponse::from).toList();
+	}
+
+	@GetMapping("/channels/{channelId}/question-sets")
+	public List<QuestionSetResponse> listByChannel(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String channelId) {
+		AuthUser teacher = authService.requireRole(authorizationHeader, Role.TEACHER);
+		return questionSetService.getByChannel(teacher.schoolId(), channelId).stream().map(QuestionSetResponse::from).toList();
 	}
 
 	@GetMapping("/question-sets/{questionSetId}")
