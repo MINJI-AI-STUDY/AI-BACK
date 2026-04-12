@@ -2,10 +2,14 @@ package com.aistudy.api.submission.service;
 
 import com.aistudy.api.common.BadRequestException;
 import com.aistudy.api.common.NotFoundException;
+import com.aistudy.api.material.model.Material;
 import com.aistudy.api.material.service.MaterialService;
 import com.aistudy.api.question.model.Question;
 import com.aistudy.api.question.model.QuestionSet;
+import com.aistudy.api.question.model.QuestionSetStatus;
 import com.aistudy.api.question.service.QuestionSetService;
+import com.aistudy.api.question.repository.QuestionSetRepository;
+import com.aistudy.api.submission.dto.StudentActiveQuestionSetResponse;
 import com.aistudy.api.submission.dto.StudentQuestionSetResponse;
 import com.aistudy.api.submission.dto.SubmitAnswerRequest;
 import com.aistudy.api.submission.dto.SubmitQuestionSetRequest;
@@ -15,6 +19,7 @@ import com.aistudy.api.submission.repository.SubmissionRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +28,40 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubmissionService {
 	private final SubmissionRepository submissionRepository;
 	private final QuestionSetService questionSetService;
+	private final QuestionSetRepository questionSetRepository;
 	private final MaterialService materialService;
 
-	public SubmissionService(SubmissionRepository submissionRepository, QuestionSetService questionSetService, MaterialService materialService) {
+	public SubmissionService(SubmissionRepository submissionRepository, QuestionSetService questionSetService, QuestionSetRepository questionSetRepository, MaterialService materialService) {
 		this.submissionRepository = submissionRepository;
 		this.questionSetService = questionSetService;
+		this.questionSetRepository = questionSetRepository;
 		this.materialService = materialService;
+	}
+
+	/** 학생 채널 워크스페이스에서 현재 자료의 활성 문제 세트를 조회합니다. */
+	@Transactional(readOnly = true)
+	public StudentActiveQuestionSetResponse getActiveQuestionSet(String schoolId, String materialId) {
+		Material material = materialService.getSchoolMaterial(schoolId, materialId);
+		Optional<QuestionSet> materialPublished = questionSetRepository
+			.findFirstByMaterialIdAndSchoolIdAndStatusOrderByCreatedAtDesc(materialId, schoolId, QuestionSetStatus.PUBLISHED)
+			.map(questionSet -> ensureSchoolScope(schoolId, questionSet));
+		if (materialPublished.isPresent()) {
+			return StudentActiveQuestionSetResponse.from(materialPublished.get(), material.getTitle());
+		}
+		if (material.getChannelId() != null && !material.getChannelId().isBlank()) {
+			return getActiveQuestionSetByChannel(schoolId, material.getChannelId());
+		}
+		throw new NotFoundException("활성화된 문제 세트를 찾을 수 없습니다.");
+	}
+
+	/** 학생 채널 워크스페이스에서 채널 기준 활성 문제 세트를 조회합니다. */
+	@Transactional(readOnly = true)
+	public StudentActiveQuestionSetResponse getActiveQuestionSetByChannel(String schoolId, String channelId) {
+		QuestionSet questionSet = questionSetService.getActivePublishedByChannel(schoolId, channelId)
+			.or(() -> findPublishedByMaterialFallback(schoolId, channelId))
+			.orElseThrow(() -> new NotFoundException("활성화된 문제 세트를 찾을 수 없습니다."));
+		String title = materialService.getSchoolMaterial(schoolId, questionSet.getMaterialId()).getTitle();
+		return StudentActiveQuestionSetResponse.from(questionSet, title);
 	}
 
 	/** 학생 문제 세트 조회 — 배포 코드와 학교 소속을 함께 검증합니다. */
@@ -126,5 +159,19 @@ public class SubmissionService {
 	@Transactional(readOnly = true)
 	public List<Submission> getAll() {
 		return submissionRepository.findAll();
+	}
+
+	private Optional<QuestionSet> findPublishedByMaterialFallback(String schoolId, String channelId) {
+		return materialService.getReadyChannelMaterials(schoolId, channelId).stream()
+			.map(material -> questionSetRepository.findFirstByMaterialIdAndSchoolIdAndStatusOrderByCreatedAtDesc(material.getId(), schoolId, QuestionSetStatus.PUBLISHED))
+			.flatMap(Optional::stream)
+			.findFirst();
+	}
+
+	private QuestionSet ensureSchoolScope(String schoolId, QuestionSet questionSet) {
+		if (!questionSet.getSchoolId().equals(schoolId)) {
+			throw new NotFoundException("활성화된 문제 세트를 찾을 수 없습니다.");
+		}
+		return questionSet;
 	}
 }

@@ -14,9 +14,13 @@
 
 ## 교사 채널 워크스페이스
 - `GET /api/teacher/channels/{channelId}/workspace`
+- 응답에 `questionSets` 요약 목록 포함 (channel 우선 + material fallback 병합)
 
 ## 학생 채널 워크스페이스
 - `GET /api/student/channels/{channelId}/workspace`
+
+## 학생 채널 활성 문제 세트
+- `GET /api/student/channels/{channelId}/active-question-set`
 
 ## 채널 실시간 이벤트
 - SSE 구독: `GET /api/channels/{channelId}/events?accessToken=`

@@ -2,6 +2,7 @@ package com.aistudy.api.question.service;
 
 import com.aistudy.api.common.BadRequestException;
 import com.aistudy.api.common.integration.AiIntegrationService;
+import com.aistudy.api.channel.service.ChannelService;
 import com.aistudy.api.common.NotFoundException;
 import com.aistudy.api.material.model.Material;
 import com.aistudy.api.material.model.MaterialStatus;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,12 +29,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class QuestionSetService {
 	private final QuestionSetRepository questionSetRepository;
 	private final MaterialService materialService;
+	private final ChannelService channelService;
 	private final AiIntegrationService aiIntegrationService;
 	private final String frontendBaseUrl;
 
-	public QuestionSetService(QuestionSetRepository questionSetRepository, MaterialService materialService, AiIntegrationService aiIntegrationService, @Value("${app.frontend.base-url}") String frontendBaseUrl) {
+	public QuestionSetService(QuestionSetRepository questionSetRepository, MaterialService materialService, ChannelService channelService, AiIntegrationService aiIntegrationService, @Value("${app.frontend.base-url}") String frontendBaseUrl) {
 		this.questionSetRepository = questionSetRepository;
 		this.materialService = materialService;
+		this.channelService = channelService;
 		this.aiIntegrationService = aiIntegrationService;
 		this.frontendBaseUrl = frontendBaseUrl;
 	}
@@ -40,6 +44,26 @@ public class QuestionSetService {
 	/** 문제 세트 생성 — 교사 소유 자료와 학교 소속을 검증한 뒤 문항 초안을 저장합니다. */
 	@Transactional
 	public QuestionSet generate(String teacherId, String schoolId, String materialId, GenerateQuestionSetRequest request) {
+		Material material = getOwnedReadyMaterial(teacherId, schoolId, materialId);
+		return generateQuestionSet(schoolId, material, resolveChannelId(schoolId, material), request);
+	}
+
+	/** 채널 기준 문제 세트 생성 — 채널 소속 자료를 지정해 문항 초안을 저장합니다. */
+	@Transactional
+	public QuestionSet generateInChannel(String teacherId, String schoolId, String channelId, GenerateQuestionSetRequest request) {
+		channelService.get(schoolId, channelId);
+		if (request.materialId() == null || request.materialId().isBlank()) {
+			throw new BadRequestException("채널 생성 시 자료 ID는 필수입니다.");
+		}
+		Material material = getOwnedReadyMaterial(teacherId, schoolId, request.materialId());
+		String materialChannelId = resolveChannelId(schoolId, material);
+		if (!materialChannelId.equals(channelId)) {
+			throw new BadRequestException("선택한 채널에 속한 자료만 문제를 생성할 수 있습니다.");
+		}
+		return generateQuestionSet(schoolId, material, channelId, request);
+	}
+
+	private Material getOwnedReadyMaterial(String teacherId, String schoolId, String materialId) {
 		Material material = materialService.getOwnedMaterial(teacherId, materialId);
 		if (!material.getSchoolId().equals(schoolId)) {
 			throw new NotFoundException("자료를 찾을 수 없습니다.");
@@ -47,12 +71,23 @@ public class QuestionSetService {
 		if (material.getStatus() != MaterialStatus.READY) {
 			throw new BadRequestException("분석 완료된 자료만 문제를 생성할 수 있습니다.");
 		}
+		return material;
+	}
+
+	private QuestionSet generateQuestionSet(String schoolId, Material material, String channelId, GenerateQuestionSetRequest request) {
 		List<Question> questions = createQuestions(material, request.questionCount());
 		if (questions.size() != request.questionCount()) {
 			throw new BadRequestException("요청한 문항 수와 생성 결과 수가 일치하지 않습니다.");
 		}
-		QuestionSet questionSet = new QuestionSet(UUID.randomUUID().toString(), schoolId, materialId, teacherId, request.difficulty(), questions);
+		QuestionSet questionSet = new QuestionSet(UUID.randomUUID().toString(), schoolId, material.getId(), channelId, material.getTeacherId(), request.difficulty(), questions);
 		return questionSetRepository.save(questionSet);
+	}
+
+	private String resolveChannelId(String schoolId, Material material) {
+		if (material.getChannelId() != null && !material.getChannelId().isBlank()) {
+			return channelService.get(schoolId, material.getChannelId()).getId();
+		}
+		return channelService.defaultChannel(schoolId).getId();
 	}
 
 	/** 문항 수정 — 교사 본인이 생성한 학교 범위의 문제 세트만 수정할 수 있습니다. */
@@ -101,6 +136,11 @@ public class QuestionSetService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<QuestionSet> getByChannel(String schoolId, String channelId) {
+		return questionSetRepository.findByChannelIdAndSchoolIdOrderByCreatedAtDesc(channelId, schoolId);
+	}
+
+	@Transactional(readOnly = true)
 	public long countByMaterial(String schoolId, String materialId) {
 		return questionSetRepository.countByMaterialIdAndSchoolId(materialId, schoolId);
 	}
@@ -109,6 +149,11 @@ public class QuestionSetService {
 	public QuestionSet getPublishedByCode(String distributionCode) {
 		return questionSetRepository.findByDistributionCodeAndStatus(distributionCode, QuestionSetStatus.PUBLISHED)
 			.orElseThrow(() -> new NotFoundException("문제 세트를 찾을 수 없습니다."));
+	}
+
+	@Transactional(readOnly = true)
+	public Optional<QuestionSet> getActivePublishedByChannel(String schoolId, String channelId) {
+		return questionSetRepository.findFirstByChannelIdAndSchoolIdAndStatusOrderByCreatedAtDesc(channelId, schoolId, QuestionSetStatus.PUBLISHED);
 	}
 
 	/** 학교 범위 내 문제 세트 목록을 반환합니다. */

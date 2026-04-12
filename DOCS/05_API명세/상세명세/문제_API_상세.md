@@ -2,12 +2,14 @@
 
 ## 1. 문제 생성
 - `POST /api/teacher/materials/{materialId}/question-sets/generate`
+- `POST /api/teacher/channels/{channelId}/question-sets/generate`
 
 ### Request Body
 | key | 타입 | 설명 | 필수 |
 | --- | --- | --- | --- |
 | questionCount | number | 생성 문항 수 (1~10) | Y |
 | difficulty | string | EASY/MEDIUM/HARD | Y |
+| materialId | string | 채널 기반 생성 시 기준 자료 ID | 채널 경로에서 Y |
 
 ### 핵심 정책
 - 4지선다
@@ -17,6 +19,7 @@
 
 ## 2. 문제 세트 조회
 - `GET /api/teacher/question-sets/{questionSetId}`
+- `GET /api/teacher/channels/{channelId}/question-sets`
 
 ## 3. 문제 수정
 - `PATCH /api/teacher/question-sets/{questionSetId}/questions/{questionId}`

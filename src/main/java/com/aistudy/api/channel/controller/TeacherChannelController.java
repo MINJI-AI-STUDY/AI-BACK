@@ -8,6 +8,7 @@ import com.aistudy.api.channel.dto.ChannelWorkspaceResponse;
 import com.aistudy.api.channel.dto.CreateChannelRequest;
 import com.aistudy.api.channel.dto.UpdateChannelRequest;
 import com.aistudy.api.channel.service.ChannelService;
+import com.aistudy.api.channel.service.ChannelWorkspaceQueryService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,10 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class TeacherChannelController {
 	private final AuthService authService;
 	private final ChannelService channelService;
+	private final ChannelWorkspaceQueryService channelWorkspaceQueryService;
 
-	public TeacherChannelController(AuthService authService, ChannelService channelService) {
+	public TeacherChannelController(AuthService authService, ChannelService channelService, ChannelWorkspaceQueryService channelWorkspaceQueryService) {
 		this.authService = authService;
 		this.channelService = channelService;
+		this.channelWorkspaceQueryService = channelWorkspaceQueryService;
 	}
 
 	/** 채널 목록 조회 — 교사 소속 학교의 활성 채널만 반환합니다. */
@@ -56,6 +59,6 @@ public class TeacherChannelController {
 	@GetMapping("/{channelId}/workspace")
 	public ChannelWorkspaceResponse workspace(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String channelId) {
 		AuthUser teacher = authService.requireRole(authorizationHeader, Role.TEACHER);
-		return channelService.workspace(teacher, channelId);
+		return channelWorkspaceQueryService.getWorkspace(teacher, channelId);
 	}
 }

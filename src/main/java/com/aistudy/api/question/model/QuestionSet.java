@@ -26,6 +26,9 @@ public class QuestionSet {
 	@Column(name = "material_id", nullable = false)
 	private String materialId;
 
+	@Column(name = "channel_id")
+	private String channelId;
+
 	@Column(name = "teacher_id", nullable = false)
 	private String teacherId;
 
@@ -54,10 +57,11 @@ public class QuestionSet {
 	protected QuestionSet() {
 	}
 
-	public QuestionSet(String id, String schoolId, String materialId, String teacherId, Difficulty difficulty, List<Question> questions) {
+	public QuestionSet(String id, String schoolId, String materialId, String channelId, String teacherId, Difficulty difficulty, List<Question> questions) {
 		this.id = id;
 		this.schoolId = schoolId;
 		this.materialId = materialId;
+		this.channelId = channelId;
 		this.teacherId = teacherId;
 		this.difficulty = difficulty;
 		this.status = QuestionSetStatus.REVIEW_REQUIRED;
@@ -78,6 +82,7 @@ public class QuestionSet {
 	public String getId() { return id; }
 	public String getSchoolId() { return schoolId; }
 	public String getMaterialId() { return materialId; }
+	public String getChannelId() { return channelId; }
 	public String getTeacherId() { return teacherId; }
 	public Difficulty getDifficulty() { return difficulty; }
 	public List<Question> getQuestions() { return questions; }
