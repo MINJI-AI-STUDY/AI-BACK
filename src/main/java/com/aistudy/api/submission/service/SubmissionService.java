@@ -5,7 +5,10 @@ import com.aistudy.api.common.NotFoundException;
 import com.aistudy.api.material.service.MaterialService;
 import com.aistudy.api.question.model.Question;
 import com.aistudy.api.question.model.QuestionSet;
+import com.aistudy.api.question.model.QuestionSetStatus;
 import com.aistudy.api.question.service.QuestionSetService;
+import com.aistudy.api.question.repository.QuestionSetRepository;
+import com.aistudy.api.submission.dto.StudentActiveQuestionSetResponse;
 import com.aistudy.api.submission.dto.StudentQuestionSetResponse;
 import com.aistudy.api.submission.dto.SubmitAnswerRequest;
 import com.aistudy.api.submission.dto.SubmitQuestionSetRequest;
@@ -23,12 +26,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubmissionService {
 	private final SubmissionRepository submissionRepository;
 	private final QuestionSetService questionSetService;
+	private final QuestionSetRepository questionSetRepository;
 	private final MaterialService materialService;
 
-	public SubmissionService(SubmissionRepository submissionRepository, QuestionSetService questionSetService, MaterialService materialService) {
+	public SubmissionService(SubmissionRepository submissionRepository, QuestionSetService questionSetService, QuestionSetRepository questionSetRepository, MaterialService materialService) {
 		this.submissionRepository = submissionRepository;
 		this.questionSetService = questionSetService;
+		this.questionSetRepository = questionSetRepository;
 		this.materialService = materialService;
+	}
+
+	/** 학생 채널 워크스페이스에서 현재 자료의 활성 문제 세트를 조회합니다. */
+	@Transactional(readOnly = true)
+	public StudentActiveQuestionSetResponse getActiveQuestionSet(String schoolId, String materialId) {
+		var material = materialService.getSchoolMaterial(schoolId, materialId);
+		QuestionSet questionSet = questionSetRepository
+			.findFirstByMaterialIdAndSchoolIdAndStatusOrderByCreatedAtDesc(materialId, schoolId, QuestionSetStatus.PUBLISHED)
+			.orElseThrow(() -> new NotFoundException("활성화된 문제 세트를 찾을 수 없습니다."));
+		return StudentActiveQuestionSetResponse.from(questionSet, material.getTitle());
 	}
 
 	/** 학생 문제 세트 조회 — 배포 코드와 학교 소속을 함께 검증합니다. */

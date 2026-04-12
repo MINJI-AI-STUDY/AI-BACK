@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface QuestionSetRepository extends JpaRepository<QuestionSet, String> {
 	Optional<QuestionSet> findByDistributionCodeAndStatus(String distributionCode, QuestionSetStatus status);
 	List<QuestionSet> findByMaterialIdAndSchoolIdOrderByCreatedAtDesc(String materialId, String schoolId);
+	Optional<QuestionSet> findFirstByMaterialIdAndSchoolIdAndStatusOrderByCreatedAtDesc(String materialId, String schoolId, QuestionSetStatus status);
 	long countByMaterialIdAndSchoolId(String materialId, String schoolId);
 	List<QuestionSet> findBySchoolId(String schoolId);
 }

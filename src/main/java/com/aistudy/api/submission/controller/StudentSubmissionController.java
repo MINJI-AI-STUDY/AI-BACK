@@ -5,6 +5,7 @@ import com.aistudy.api.auth.AuthUser;
 import com.aistudy.api.auth.Role;
 import com.aistudy.api.submission.dto.StudentQuestionSetResponse;
 import com.aistudy.api.submission.dto.StudentResultResponse;
+import com.aistudy.api.submission.dto.StudentActiveQuestionSetResponse;
 import com.aistudy.api.submission.dto.SubmissionResponse;
 import com.aistudy.api.submission.dto.SubmitQuestionSetRequest;
 import com.aistudy.api.submission.model.Submission;
@@ -33,6 +34,12 @@ public class StudentSubmissionController {
 	public StudentQuestionSetResponse getQuestionSet(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String distributionCode) {
 		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
 		return submissionService.getQuestionSet(distributionCode, student.schoolId());
+	}
+
+	@GetMapping("/materials/{materialId}/active-question-set")
+	public StudentActiveQuestionSetResponse getActiveQuestionSet(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String materialId) {
+		AuthUser student = authService.requireRole(authorizationHeader, Role.STUDENT);
+		return submissionService.getActiveQuestionSet(student.schoolId(), materialId);
 	}
 
 	@PostMapping("/question-sets/{distributionCode}/submissions")
