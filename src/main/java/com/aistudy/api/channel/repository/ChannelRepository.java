@@ -7,5 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChannelRepository extends JpaRepository<Channel, String> {
 	List<Channel> findBySchoolIdAndActiveTrueOrderBySortOrderAsc(String schoolId);
+	List<Channel> findBySchoolIdOrderBySortOrderAsc(String schoolId);
 	Optional<Channel> findByIdAndSchoolId(String id, String schoolId);
 }

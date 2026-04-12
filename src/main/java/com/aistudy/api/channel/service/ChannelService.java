@@ -4,12 +4,16 @@ import com.aistudy.api.auth.AuthUser;
 import com.aistudy.api.channel.dto.ChannelMessageResponse;
 import com.aistudy.api.channel.dto.ChannelParticipantResponse;
 import com.aistudy.api.channel.dto.ChannelWorkspaceResponse;
+import com.aistudy.api.channel.dto.CurateTestChannelsResponse;
 import com.aistudy.api.channel.model.Channel;
 import com.aistudy.api.channel.repository.ChannelRepository;
 import com.aistudy.api.common.NotFoundException;
 import com.aistudy.api.material.dto.MaterialSummaryResponse;
 import com.aistudy.api.material.repository.MaterialRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,5 +71,37 @@ public class ChannelService {
 		List<ChannelMessageResponse> recentMessages = channelMessageService.recent(channel.getId());
 		List<ChannelParticipantResponse> participants = channelPresenceService.current(channel.getId());
 		return new ChannelWorkspaceResponse(com.aistudy.api.channel.dto.ChannelResponse.from(channel), materials, recentMessages, participants);
+	}
+
+	/** 테스트용 채널을 의도한 소수 세트로 정리합니다. 유지 대상 외 채널은 비활성화합니다. */
+	@Transactional
+	public CurateTestChannelsResponse curateForTesting(AuthUser operator, String schoolId, List<String> keepNames) {
+		List<Channel> channels = channelRepository.findBySchoolIdOrderBySortOrderAsc(schoolId);
+		Map<String, Channel> byName = channels.stream().collect(Collectors.toMap(Channel::getName, Function.identity(), (left, right) -> left));
+		int createdCount = 0;
+		int deactivatedCount = 0;
+
+		for (int index = 0; index < keepNames.size(); index++) {
+			String name = keepNames.get(index);
+			Channel existing = byName.get(name);
+			if (existing == null) {
+				channelRepository.save(new Channel(schoolId, name, "실사용 QA용 기본 채널", index + 1, operator.userId()));
+				createdCount++;
+			} else {
+				existing.update(existing.getName(), existing.getDescription(), index + 1, true);
+				channelRepository.save(existing);
+			}
+		}
+
+		for (Channel channel : channels) {
+			if (!keepNames.contains(channel.getName()) && channel.isActive()) {
+				channel.update(channel.getName(), channel.getDescription(), channel.getSortOrder(), false);
+				channelRepository.save(channel);
+				deactivatedCount++;
+			}
+		}
+
+		int keptCount = channelRepository.findBySchoolIdAndActiveTrueOrderBySortOrderAsc(schoolId).size();
+		return new CurateTestChannelsResponse(keptCount, createdCount, deactivatedCount);
 	}
 }
