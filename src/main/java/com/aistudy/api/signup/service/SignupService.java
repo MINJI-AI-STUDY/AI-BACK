@@ -73,19 +73,12 @@ public class SignupService {
 	}
 
 	/** 학생 가입 요청 — 학교 활성 여부 및 학급-학교 소속 일치를 검증합니다. PIN을 해시하여 저장합니다.
-	 *  studentCode는 선택 사항이며, 미제공 시 운영자가 승인 시 지정합니다.
-	 *  동일 실명은 허용되며, 고유성은 studentCode 범위로 보장합니다.
+	 *  학생은 학교, 실명, PIN만 입력하고 studentCode는 승인 시 내부 생성합니다.
 	 */
 	@Transactional
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
-		// studentCode가 제공된 경우 학교 범위 내 고유성 검증
-		if (request.studentCode() != null && !request.studentCode().isBlank()) {
-			if (authUserRepository.existsBySchoolIdAndStudentCodeAndRole(request.schoolId(), request.studentCode(), Role.STUDENT)) {
-				throw new BadRequestException("같은 학교에 동일한 학생 코드가 이미 존재합니다.");
-			}
-		}
 		if (request.classroomId() != null && !request.classroomId().isBlank()) {
 			classroomRepository.findByIdAndSchoolId(request.classroomId(), request.schoolId())
 				.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
@@ -99,7 +92,7 @@ public class SignupService {
 			SignupRole.STUDENT,
 			null,
 			request.realName(),
-			request.studentCode(),
+			null,
 			request.consentTerms(),
 			request.consentPrivacy(),
 			request.consentStudentNotice()

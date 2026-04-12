@@ -60,6 +60,6 @@ public class SignupController {
 	@PatchMapping("/requests/{signupRequestId}")
 	public SignupRequestResponse review(@RequestHeader(name = "Authorization", required = false) String authorizationHeader, @PathVariable String signupRequestId, @Valid @RequestBody ReviewSignupRequest request) {
 		AuthUser reviewer = authService.getCurrentUser(authorizationHeader);
-		return SignupRequestResponse.from(signupService.review(reviewer, signupRequestId, request.approve(), request.normalizedReason(), request.studentCode()));
+		return SignupRequestResponse.from(signupService.review(reviewer, signupRequestId, request.approve(), request.normalizedReason(), null));
 	}
 }
