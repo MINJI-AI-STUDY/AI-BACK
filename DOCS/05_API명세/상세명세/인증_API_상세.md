@@ -52,13 +52,13 @@
 | key | 타입 | 설명 | 필수 |
 | --- | --- | --- | --- |
 | schoolId | string | 학교 ID | Y |
-| studentName | string | 학생 실명 | Y |
+| studentCode | string | 학교 범위 내 학생 고유 코드 | Y |
 | pin | string | 학생 PIN | Y |
 
 ```json
 {
   "schoolId": "school-a",
-  "studentName": "학생 목업",
+  "studentCode": "S001",
   "pin": "student123"
 }
 ```
@@ -71,7 +71,8 @@
   "role": "STUDENT",
   "displayName": "학생 목업",
   "schoolId": "school-a",
-  "classroomId": "class-a"
+  "classroomId": "class-a",
+  "studentCode": "S001"
 }
 ```
 
@@ -92,7 +93,11 @@
   "schoolId": "school-a",
   "classroomId": "class-a",
   "role": "TEACHER",
-  "displayName": "교사 데모"
+  "displayName": "교사 데모",
+  "studentCode": null,
+  "active": true,
+  "createdAt": "2026-01-01T00:00:00",
+  "privacyConsents": []
 }
 ```
 
