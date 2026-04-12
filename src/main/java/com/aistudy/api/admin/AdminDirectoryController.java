@@ -14,6 +14,9 @@ import com.aistudy.api.auth.AuthUser;
 import com.aistudy.api.auth.AuthUserEntity;
 import com.aistudy.api.auth.AuthUserRepository;
 import com.aistudy.api.auth.Role;
+import com.aistudy.api.channel.dto.CurateTestChannelsRequest;
+import com.aistudy.api.channel.dto.CurateTestChannelsResponse;
+import com.aistudy.api.channel.service.ChannelService;
 import com.aistudy.api.common.ForbiddenException;
 import com.aistudy.api.common.NotFoundException;
 import com.aistudy.api.signup.dto.SchoolMasterSyncResponse;
@@ -44,16 +47,18 @@ public class AdminDirectoryController {
 	private final ClassroomRepository classroomRepository;
 	private final AuthUserRepository authUserRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final ChannelService channelService;
 	private final SchoolMasterSyncService schoolMasterSyncService;
 	private final SchoolMasterRepository schoolMasterRepository;
 	private final SchoolOperatorMembershipRepository schoolOperatorMembershipRepository;
 
-	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, SchoolMasterSyncService schoolMasterSyncService, SchoolMasterRepository schoolMasterRepository, SchoolOperatorMembershipRepository schoolOperatorMembershipRepository) {
+	public AdminDirectoryController(AuthService authService, SchoolRepository schoolRepository, ClassroomRepository classroomRepository, AuthUserRepository authUserRepository, PasswordEncoder passwordEncoder, ChannelService channelService, SchoolMasterSyncService schoolMasterSyncService, SchoolMasterRepository schoolMasterRepository, SchoolOperatorMembershipRepository schoolOperatorMembershipRepository) {
 		this.authService = authService;
 		this.schoolRepository = schoolRepository;
 		this.classroomRepository = classroomRepository;
 		this.authUserRepository = authUserRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.channelService = channelService;
 		this.schoolMasterSyncService = schoolMasterSyncService;
 		this.schoolMasterRepository = schoolMasterRepository;
 		this.schoolOperatorMembershipRepository = schoolOperatorMembershipRepository;
@@ -175,6 +180,19 @@ public class AdminDirectoryController {
 	public SchoolMasterSyncResponse syncSchoolMaster(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
 		authService.requireRole(authorizationHeader, Role.OPERATOR);
 		return schoolMasterSyncService.syncAll();
+	}
+
+	/** 운영자 테스트 환경용 채널 정리 — 유지 대상 외 채널은 비활성화하고 없으면 생성합니다. */
+	@PostMapping("/schools/{schoolId}/channels/curate-test-set")
+	public CurateTestChannelsResponse curateTestChannels(
+		@RequestHeader(name = "Authorization", required = false) String authorizationHeader,
+		@PathVariable String schoolId,
+		@Valid @RequestBody(required = false) CurateTestChannelsRequest request
+	) {
+		AuthUser operator = authService.requireRole(authorizationHeader, Role.OPERATOR);
+		ensureOperatorManagesSchool(operator.userId(), schoolId);
+		CurateTestChannelsRequest safeRequest = request == null ? new CurateTestChannelsRequest(List.of()) : request;
+		return channelService.curateForTesting(operator, schoolId, safeRequest.normalizedKeepNames());
 	}
 
 	/** 운영자가 관리하는 학교 ID 목록을 반환합니다. */
