@@ -73,7 +73,7 @@ public class SignupService {
 	}
 
 	/** 학생 가입 요청 — 학교 활성 여부 및 학급-학교 소속 일치를 검증합니다. PIN을 해시하여 저장합니다.
-	 *  학생은 학교, 실명, PIN만 입력하고 studentCode는 승인 시 내부 생성합니다.
+	 *  학생은 학교, 실명, 선택 studentCode, PIN을 입력하고 studentCode는 승인 시 최종 확정됩니다.
 	 */
 	@Transactional
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
@@ -175,15 +175,16 @@ public class SignupService {
 		if (requestedStudentCode != null) {
 			return requestedStudentCode;
 		}
-		return generateStudentCode();
+		return generateStudentCode(request.getSchoolId());
 	}
 
 	/** 학교 범위 내 고유한 학생 코드를 자동 생성합니다. */
-	private String generateStudentCode() {
+	private String generateStudentCode(String schoolId) {
 		for (int attempt = 0; attempt < 10; attempt++) {
 			String code = "S" + String.format("%04d", ThreadLocalRandom.current().nextInt(1, 10000));
-			// 학교 범위 검증은 호출 측에서 수행하므로 여기서는 형식만 보장
-			return code;
+			if (!authUserRepository.existsBySchoolIdAndStudentCodeAndRole(schoolId, code, Role.STUDENT)) {
+				return code;
+			}
 		}
 		throw new IllegalStateException("학생 코드를 생성할 수 없습니다.");
 	}

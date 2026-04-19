@@ -3,7 +3,6 @@ package com.aistudy.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 
 import org.junit.jupiter.api.Test;
@@ -764,6 +763,63 @@ class ApiApplicationTests {
 		.andExpect(jsonPath("$.status").value("APPROVED"))
 		.andExpect(jsonPath("$.studentCode").value("S9999"))
 		.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
+	}
+
+	/**
+	 * 학생 승인 시 studentCode를 지정하지 않으면 학교 범위 내 자동 생성 코드로 승인되어야 합니다.
+	 */
+	@Test
+	void 학생_승인시_studentCode가_없으면_자동생성된다() throws Exception {
+		String signupResponse = mockMvc.perform(
+			post("/api/signup/student")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "schoolId":"school-a",
+					  "classroomId":"class-a",
+					  "realName":"자동생성 학생",
+					  "pin":"2468",
+					  "consentTerms":true,
+					  "consentPrivacy":true,
+					  "consentStudentNotice":true
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.studentCode").doesNotExist())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		String signupRequestId = signupResponse.replaceAll(".*\"signupRequestId\":\"([^\"]+)\".*", "$1");
+
+		String operatorToken = operatorAccessToken();
+
+		String approvedPayload = mockMvc.perform(
+			MockMvcRequestBuilders.patch("/api/signup/requests/" + signupRequestId)
+				.header("Authorization", "Bearer " + operatorToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"approve":true,"rejectionReason":null}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("APPROVED"))
+			.andExpect(jsonPath("$.studentCode").isString())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		Matcher matcher = Pattern.compile("\\\"studentCode\\\":\\\"(S\\d{4})\\\"").matcher(approvedPayload);
+		org.junit.jupiter.api.Assertions.assertTrue(matcher.find(), "자동 생성된 studentCode 형식이 응답에 있어야 합니다.");
+		String generatedStudentCode = matcher.group(1);
+
+		mockMvc.perform(
+			post("/api/auth/student/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"schoolId":"school-a","studentCode":"%s","pin":"2468"}
+					""".formatted(generatedStudentCode)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.studentCode").value(generatedStudentCode));
 	}
 
 	private String teacherAccessToken() throws Exception {
