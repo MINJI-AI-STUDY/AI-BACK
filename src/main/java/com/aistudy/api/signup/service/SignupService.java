@@ -79,6 +79,10 @@ public class SignupService {
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
+		String requestedStudentCode = normalizeStudentCode(request.studentCode());
+		if (requestedStudentCode != null && authUserRepository.existsBySchoolIdAndStudentCodeAndRole(request.schoolId(), requestedStudentCode, Role.STUDENT)) {
+			throw new BadRequestException("같은 학교에 동일한 학생 코드가 이미 존재합니다.");
+		}
 		if (request.classroomId() != null && !request.classroomId().isBlank()) {
 			classroomRepository.findByIdAndSchoolId(request.classroomId(), request.schoolId())
 				.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
@@ -92,7 +96,7 @@ public class SignupService {
 			SignupRole.STUDENT,
 			null,
 			request.realName(),
-			null,
+			requestedStudentCode,
 			request.consentTerms(),
 			request.consentPrivacy(),
 			request.consentStudentNotice()
@@ -163,11 +167,13 @@ public class SignupService {
 
 	/** studentCode 확정 로직: 운영자 지정 > 요청 시 제출 > 자동 생성 */
 	private String resolveStudentCode(SignupRequestEntity request, String operatorStudentCode) {
-		if (operatorStudentCode != null && !operatorStudentCode.isBlank()) {
-			return operatorStudentCode.trim();
+		String normalizedOperatorStudentCode = normalizeStudentCode(operatorStudentCode);
+		if (normalizedOperatorStudentCode != null) {
+			return normalizedOperatorStudentCode;
 		}
-		if (request.getStudentCode() != null && !request.getStudentCode().isBlank()) {
-			return request.getStudentCode();
+		String requestedStudentCode = normalizeStudentCode(request.getStudentCode());
+		if (requestedStudentCode != null) {
+			return requestedStudentCode;
 		}
 		return generateStudentCode();
 	}
@@ -188,5 +194,13 @@ public class SignupService {
 		}
 		schoolOperatorMembershipRepository.findBySchoolIdAndUserIdAndActiveTrue(schoolId, reviewer.userId())
 			.orElseThrow(() -> new ForbiddenException("학교 운영자 권한이 없습니다."));
+	}
+
+	private String normalizeStudentCode(String studentCode) {
+		if (studentCode == null) {
+			return null;
+		}
+		String normalized = studentCode.trim();
+		return normalized.isBlank() ? null : normalized;
 	}
 }

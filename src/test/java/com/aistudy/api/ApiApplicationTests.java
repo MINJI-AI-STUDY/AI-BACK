@@ -666,7 +666,7 @@ class ApiApplicationTests {
 			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"schoolId":"school-a","studentName":"학생 목업","pin":"student123"}
+					{"schoolId":"school-a","studentCode":"S001","pin":"student123"}
 					"""))
 		.andExpect(status().isOk())
 		.andExpect(jsonPath("$.accessToken").isNotEmpty())
@@ -685,7 +685,7 @@ class ApiApplicationTests {
 			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"schoolId":"school-a","studentName":"학생 목업","pin":"wrong-pin"}
+					{"schoolId":"school-a","studentCode":"S001","pin":"wrong-pin"}
 					"""))
 		.andExpect(status().isUnauthorized())
 		.andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
@@ -704,6 +704,7 @@ class ApiApplicationTests {
 					  "schoolId":"school-a",
 					  "classroomId":"class-a",
 					  "realName":"테스트 학생",
+					  "studentCode":"S1300",
 					  "pin":"1234",
 					  "consentTerms":true,
 					  "consentPrivacy":true,
@@ -712,13 +713,13 @@ class ApiApplicationTests {
 					"""))
 		.andExpect(status().isOk())
 		.andExpect(jsonPath("$.schoolId").value("school-a"))
-		.andExpect(jsonPath("$.studentCode").isEmpty())
+		.andExpect(jsonPath("$.studentCode").value("S1300"))
 		.andExpect(jsonPath("$.status").value("PENDING"));
 	}
 
 	/**
 	 * 학생 승인 시 provisionedTempPassword가 노출되지 않아야 합니다.
-	 * studentCode는 내부 생성되며 사용자에게 노출하지 않습니다.
+	 * 운영자는 studentCode를 승인 단계에서 확정할 수 있습니다.
 	 */
 	@Test
 	void 학생_승인시_임시비밀번호가_노출되지_않는다() throws Exception {
@@ -730,6 +731,7 @@ class ApiApplicationTests {
 					  "schoolId":"school-a",
 					  "classroomId":"class-a",
 					  "realName":"PIN 학생",
+					  "studentCode":"S2001",
 					  "pin":"5678",
 					  "consentTerms":true,
 					  "consentPrivacy":true,
@@ -756,11 +758,11 @@ class ApiApplicationTests {
 				.header("Authorization", "Bearer " + operatorToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"approve":true,"rejectionReason":null}
+					{"approve":true,"rejectionReason":null,"studentCode":"S9999"}
 					"""))
 		.andExpect(status().isOk())
 		.andExpect(jsonPath("$.status").value("APPROVED"))
-		.andExpect(jsonPath("$.studentCode").isNotEmpty())
+		.andExpect(jsonPath("$.studentCode").value("S9999"))
 		.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
 	}
 
@@ -783,7 +785,7 @@ class ApiApplicationTests {
 			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"schoolId":"school-a","studentName":"학생 목업","pin":"student123"}
+					{"schoolId":"school-a","studentCode":"S001","pin":"student123"}
 					"""))
 		.andExpect(status().isOk())
 		.andReturn()
