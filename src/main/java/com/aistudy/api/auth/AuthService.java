@@ -1,6 +1,5 @@
 package com.aistudy.api.auth;
 
-import com.aistudy.api.common.BadRequestException;
 import com.aistudy.api.common.ForbiddenException;
 import io.jsonwebtoken.JwtException;
 import java.time.LocalDateTime;
@@ -39,20 +38,13 @@ public class AuthService {
 		return LoginResponse.from(issueTokens(user));
 	}
 
-	/** 학생 PIN 로그인 — 학교 범위 내 학생 실명과 PIN으로 인증합니다. */
+	/** 학생 PIN 로그인 — 학교 범위 내 학생 코드와 PIN으로 인증합니다. */
 	@Transactional
 	public StudentLoginResponse studentLogin(StudentLoginRequest request) {
-		List<AuthUserEntity> matched = authUserRepository.findAllBySchoolIdAndDisplayNameAndRole(request.schoolId(), request.studentName(), Role.STUDENT)
-			.stream()
+		AuthUserEntity entity = authUserRepository.findBySchoolIdAndStudentCodeAndRole(request.schoolId(), request.studentCode(), Role.STUDENT)
 			.filter(AuthUserEntity::isActive)
 			.filter(candidate -> candidate.getPin() != null && passwordEncoder.matches(request.pin(), candidate.getPin()))
-			.toList();
-		if (matched.size() > 1) {
-			throw new BadRequestException("같은 학교에 동일한 이름과 PIN을 가진 학생이 여러 명 존재합니다. 학교 운영자에게 문의하세요.");
-		}
-		AuthUserEntity entity = matched.stream()
-			.findFirst()
-			.orElseThrow(() -> new AuthException("학교, 이름 또는 PIN이 올바르지 않습니다."));
+			.orElseThrow(() -> new AuthException("학교, 학생 코드 또는 PIN이 올바르지 않습니다."));
 
 		AuthUser user = entity.toAuthUser();
 		return StudentLoginResponse.from(issueTokens(user), user.schoolId(), user.classroomId(), user.studentCode());

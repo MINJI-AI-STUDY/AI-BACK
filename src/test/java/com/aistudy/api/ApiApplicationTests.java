@@ -3,7 +3,6 @@ package com.aistudy.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 
 import org.junit.jupiter.api.Test;
@@ -666,7 +665,7 @@ class ApiApplicationTests {
 			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"schoolId":"school-a","studentName":"학생 목업","pin":"student123"}
+					{"schoolId":"school-a","studentCode":"S001","pin":"student123"}
 					"""))
 		.andExpect(status().isOk())
 		.andExpect(jsonPath("$.accessToken").isNotEmpty())
@@ -685,7 +684,7 @@ class ApiApplicationTests {
 			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"schoolId":"school-a","studentName":"학생 목업","pin":"wrong-pin"}
+					{"schoolId":"school-a","studentCode":"S001","pin":"wrong-pin"}
 					"""))
 		.andExpect(status().isUnauthorized())
 		.andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
@@ -704,6 +703,7 @@ class ApiApplicationTests {
 					  "schoolId":"school-a",
 					  "classroomId":"class-a",
 					  "realName":"테스트 학생",
+					  "studentCode":"S1300",
 					  "pin":"1234",
 					  "consentTerms":true,
 					  "consentPrivacy":true,
@@ -712,13 +712,13 @@ class ApiApplicationTests {
 					"""))
 		.andExpect(status().isOk())
 		.andExpect(jsonPath("$.schoolId").value("school-a"))
-		.andExpect(jsonPath("$.studentCode").isEmpty())
+		.andExpect(jsonPath("$.studentCode").value("S1300"))
 		.andExpect(jsonPath("$.status").value("PENDING"));
 	}
 
 	/**
 	 * 학생 승인 시 provisionedTempPassword가 노출되지 않아야 합니다.
-	 * studentCode는 내부 생성되며 사용자에게 노출하지 않습니다.
+	 * 운영자는 studentCode를 승인 단계에서 확정할 수 있습니다.
 	 */
 	@Test
 	void 학생_승인시_임시비밀번호가_노출되지_않는다() throws Exception {
@@ -730,6 +730,7 @@ class ApiApplicationTests {
 					  "schoolId":"school-a",
 					  "classroomId":"class-a",
 					  "realName":"PIN 학생",
+					  "studentCode":"S2001",
 					  "pin":"5678",
 					  "consentTerms":true,
 					  "consentPrivacy":true,
@@ -756,12 +757,69 @@ class ApiApplicationTests {
 				.header("Authorization", "Bearer " + operatorToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"approve":true,"rejectionReason":null}
+					{"approve":true,"rejectionReason":null,"studentCode":"S9999"}
 					"""))
 		.andExpect(status().isOk())
 		.andExpect(jsonPath("$.status").value("APPROVED"))
-		.andExpect(jsonPath("$.studentCode").isNotEmpty())
+		.andExpect(jsonPath("$.studentCode").value("S9999"))
 		.andExpect(jsonPath("$.provisionedTempPassword").value(nullValue()));
+	}
+
+	/**
+	 * 학생 승인 시 studentCode를 지정하지 않으면 학교 범위 내 자동 생성 코드로 승인되어야 합니다.
+	 */
+	@Test
+	void 학생_승인시_studentCode가_없으면_자동생성된다() throws Exception {
+		String signupResponse = mockMvc.perform(
+			post("/api/signup/student")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "schoolId":"school-a",
+					  "classroomId":"class-a",
+					  "realName":"자동생성 학생",
+					  "pin":"2468",
+					  "consentTerms":true,
+					  "consentPrivacy":true,
+					  "consentStudentNotice":true
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.studentCode").doesNotExist())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		String signupRequestId = signupResponse.replaceAll(".*\"signupRequestId\":\"([^\"]+)\".*", "$1");
+
+		String operatorToken = operatorAccessToken();
+
+		String approvedPayload = mockMvc.perform(
+			MockMvcRequestBuilders.patch("/api/signup/requests/" + signupRequestId)
+				.header("Authorization", "Bearer " + operatorToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"approve":true,"rejectionReason":null}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("APPROVED"))
+			.andExpect(jsonPath("$.studentCode").isString())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		Matcher matcher = Pattern.compile("\\\"studentCode\\\":\\\"(S\\d{4})\\\"").matcher(approvedPayload);
+		org.junit.jupiter.api.Assertions.assertTrue(matcher.find(), "자동 생성된 studentCode 형식이 응답에 있어야 합니다.");
+		String generatedStudentCode = matcher.group(1);
+
+		mockMvc.perform(
+			post("/api/auth/student/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"schoolId":"school-a","studentCode":"%s","pin":"2468"}
+					""".formatted(generatedStudentCode)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.studentCode").value(generatedStudentCode));
 	}
 
 	private String teacherAccessToken() throws Exception {
@@ -783,7 +841,7 @@ class ApiApplicationTests {
 			post("/api/auth/student/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"schoolId":"school-a","studentName":"학생 목업","pin":"student123"}
+					{"schoolId":"school-a","studentCode":"S001","pin":"student123"}
 					"""))
 		.andExpect(status().isOk())
 		.andReturn()

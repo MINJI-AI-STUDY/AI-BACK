@@ -73,12 +73,16 @@ public class SignupService {
 	}
 
 	/** 학생 가입 요청 — 학교 활성 여부 및 학급-학교 소속 일치를 검증합니다. PIN을 해시하여 저장합니다.
-	 *  학생은 학교, 실명, PIN만 입력하고 studentCode는 승인 시 내부 생성합니다.
+	 *  학생은 학교, 실명, 선택 studentCode, PIN을 입력하고 studentCode는 승인 시 최종 확정됩니다.
 	 */
 	@Transactional
 	public SignupRequestEntity requestStudentSignup(CreateStudentSignupRequest request) {
 		SchoolMasterEntity school = schoolMasterRepository.findById(request.schoolId()).orElseThrow(() -> new NotFoundException("학교를 찾을 수 없습니다."));
 		if (!school.isActive()) throw new BadRequestException("비활성 학교입니다.");
+		String requestedStudentCode = normalizeStudentCode(request.studentCode());
+		if (requestedStudentCode != null && authUserRepository.existsBySchoolIdAndStudentCodeAndRole(request.schoolId(), requestedStudentCode, Role.STUDENT)) {
+			throw new BadRequestException("같은 학교에 동일한 학생 코드가 이미 존재합니다.");
+		}
 		if (request.classroomId() != null && !request.classroomId().isBlank()) {
 			classroomRepository.findByIdAndSchoolId(request.classroomId(), request.schoolId())
 				.orElseThrow(() -> new NotFoundException("해당 학교의 학급을 찾을 수 없습니다."));
@@ -92,7 +96,7 @@ public class SignupService {
 			SignupRole.STUDENT,
 			null,
 			request.realName(),
-			null,
+			requestedStudentCode,
 			request.consentTerms(),
 			request.consentPrivacy(),
 			request.consentStudentNotice()
@@ -163,21 +167,24 @@ public class SignupService {
 
 	/** studentCode 확정 로직: 운영자 지정 > 요청 시 제출 > 자동 생성 */
 	private String resolveStudentCode(SignupRequestEntity request, String operatorStudentCode) {
-		if (operatorStudentCode != null && !operatorStudentCode.isBlank()) {
-			return operatorStudentCode.trim();
+		String normalizedOperatorStudentCode = normalizeStudentCode(operatorStudentCode);
+		if (normalizedOperatorStudentCode != null) {
+			return normalizedOperatorStudentCode;
 		}
-		if (request.getStudentCode() != null && !request.getStudentCode().isBlank()) {
-			return request.getStudentCode();
+		String requestedStudentCode = normalizeStudentCode(request.getStudentCode());
+		if (requestedStudentCode != null) {
+			return requestedStudentCode;
 		}
-		return generateStudentCode();
+		return generateStudentCode(request.getSchoolId());
 	}
 
 	/** 학교 범위 내 고유한 학생 코드를 자동 생성합니다. */
-	private String generateStudentCode() {
+	private String generateStudentCode(String schoolId) {
 		for (int attempt = 0; attempt < 10; attempt++) {
 			String code = "S" + String.format("%04d", ThreadLocalRandom.current().nextInt(1, 10000));
-			// 학교 범위 검증은 호출 측에서 수행하므로 여기서는 형식만 보장
-			return code;
+			if (!authUserRepository.existsBySchoolIdAndStudentCodeAndRole(schoolId, code, Role.STUDENT)) {
+				return code;
+			}
 		}
 		throw new IllegalStateException("학생 코드를 생성할 수 없습니다.");
 	}
@@ -188,5 +195,13 @@ public class SignupService {
 		}
 		schoolOperatorMembershipRepository.findBySchoolIdAndUserIdAndActiveTrue(schoolId, reviewer.userId())
 			.orElseThrow(() -> new ForbiddenException("학교 운영자 권한이 없습니다."));
+	}
+
+	private String normalizeStudentCode(String studentCode) {
+		if (studentCode == null) {
+			return null;
+		}
+		String normalized = studentCode.trim();
+		return normalized.isBlank() ? null : normalized;
 	}
 }
